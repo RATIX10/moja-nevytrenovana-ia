@@ -1,44 +1,78 @@
 <!DOCTYPE html>
-<html>
+<html lang="sk">
 <head>
-    <title>Nevytrenovaný AI Model</title>
+    <meta charset="UTF-8">
+    <title>Moje Trénovateľné AI</title>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+    <style>
+        body { font-family: sans-serif; background: #f4f4f9; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+        #chat-box { width: 400px; height: 300px; border: 1px solid #ccc; background: white; overflow-y: scroll; padding: 10px; margin-bottom: 10px; border-radius: 8px; }
+        .controls { display: flex; flex-direction: column; gap: 10px; width: 420px; }
+        input, button { padding: 10px; border-radius: 5px; border: 1px solid #ddd; }
+        button { background: #007bff; color: white; cursor: pointer; font-weight: bold; }
+        button:hover { background: #0056b3; }
+        .log { font-size: 0.8em; color: #666; margin-top: 10px; }
+    </style>
 </head>
 <body>
-    <h1>Môj prvý nevytrenovaný model</h1>
-    <p>Otvorte konzolu (F12), aby ste videli štruktúru modelu.</p>
+
+    <h1>Učiace sa AI (Chat)</h1>
+    
+    <div id="chat-box">
+        <div><strong>AI:</strong> Ahoj! Som nevytrenovaný model. Napíš niečo a potom ma nauč, či je to "dobré" (1) alebo "zlé" (0).</div>
+    </div>
+
+    <div class="controls">
+        <input type="text" id="userInput" placeholder="Napíš správu...">
+        <input type="number" id="targetInput" placeholder="Správna odpoveď (napr. 0 alebo 1)" step="0.1">
+        <button onclick="trainAndPredict()">Odoslať a Trénovať</button>
+    </div>
+
+    <div class="log" id="status">Stav: Model je pripravený.</div>
 
     <script>
-        async function vytvorModel() {
-            // 1. Definícia architektúry (nevytrenovaný model)
-            const model = tf.sequential();
+        // 1. Definícia nevytrenovaného modelu
+        const model = tf.sequential();
+        model.add(tf.layers.dense({units: 8, activation: 'relu', inputShape: [1]})); // Vstup je dĺžka textu
+        model.add(tf.layers.dense({units: 1})); // Výstup je jedno číslo
+        
+        model.compile({optimizer: 'adam', loss: 'meanSquaredError'});
 
-            // Pridanie prvej vrstvy (vstupná vrstva)
-            model.add(tf.layers.dense({units: 10, activation: 'relu', inputShape: [1]}));
+        const chatBox = document.getElementById('chat-box');
+        const status = document.getElementById('status');
 
-            // Pridanie skrytej vrstvy
-            model.add(tf.layers.dense({units: 5, activation: 'relu'}));
+        async function trainAndPredict() {
+            const text = document.getElementById('userInput').value;
+            const target = parseFloat(document.getElementById('targetInput').value);
 
-            // Výstupná vrstva (1 jednotka pre jedno výsledné číslo)
-            model.add(tf.layers.dense({units: 1}));
+            if (text === "" || isNaN(target)) {
+                alert("Prosím, zadaj text aj číselnú hodnotu pre tréning!");
+                return;
+            }
 
-            // 2. Kompilácia modelu (nastavenie "pravidiel" učenia)
-            model.compile({
-                optimizer: 'adam',
-                loss: 'meanSquaredError'
-            });
+            // Pridanie správy používateľa do chatu
+            chatBox.innerHTML += `<div><strong>Ty:</strong> ${text} (Cieľ: ${target})</div>`;
 
-            // Výpis do konzoly
-            console.log("Model bol úspešne vytvorený!");
-            model.summary(); 
+            // Prevod textu na číslo (dĺžka textu) - toto je to, čo sa model učí
+            const inputTensor = tf.tensor2d([text.length], [1, 1]);
+            const targetTensor = tf.tensor2d([target], [1, 1]);
 
-            // Príklad predpovede s nevytreným modelom (vráti náhodný výsledok)
-            const vstup = tf.tensor2d([5], [1, 1]);
-            const vysledok = model.predict(vstup);
-            vysledok.print();
+            status.innerText = "Stav: Trénujem sa...";
+
+            // 2. Trénovanie "za pochodu" (10 cyklov pri každom odoslaní)
+            await model.fit(inputTensor, targetTensor, {epochs: 10});
+
+            // 3. Predpoveď po natrénovaní
+            const prediction = model.predict(inputTensor);
+            const predictedValue = (await prediction.data())[0];
+
+            chatBox.innerHTML += `<div><strong>AI Odpoveď:</strong> Môj odhad pre túto dĺžku textu je: ${predictedValue.toFixed(4)}</div>`;
+            status.innerText = "Stav: Doučené!";
+            
+            // Vyčistenie polí a skrolovanie dolu
+            document.getElementById('userInput').value = "";
+            chatBox.scrollTop = chatBox.scrollHeight;
         }
-
-        vytvorModel();
     </script>
 </body>
 </html>
