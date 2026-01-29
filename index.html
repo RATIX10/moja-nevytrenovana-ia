@@ -2,55 +2,81 @@
 <html lang="sk">
 <head>
     <meta charset="UTF-8">
-    <title>Moja Nevytrénovaná IA - Globálna Pamäť</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Globálna AI - Mobilná Verzia</title>
+    
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/knn-classifier"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+
     <style>
         :root { --bg: #0d1117; --accent: #58a6ff; --success: #238636; }
-        body { margin: 0; background: var(--bg); color: white; font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; }
-        nav { background: #161b22; padding: 15px; display: flex; gap: 10px; border-bottom: 2px solid var(--accent); justify-content: center; }
-        .nav-btn { background: #30363d; border: 1px solid var(--accent); color: white; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        body { margin: 0; background: var(--bg); color: white; font-family: -apple-system, sans-serif; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        
+        /* Navigácia upravená pre mobil */
+        nav { background: #161b22; padding: 10px; display: flex; gap: 8px; border-bottom: 2px solid var(--accent); justify-content: center; }
+        .nav-btn { flex: 1; background: #30363d; border: 1px solid var(--accent); color: white; padding: 12px 5px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 0.9em; }
         .nav-btn.active { background: var(--accent); }
-        .main { display: flex; flex: 1; padding: 20px; gap: 20px; overflow: hidden; }
-        #video-box { flex: 2; background: black; border-radius: 15px; position: relative; border: 2px solid #30363d; overflow: hidden; }
-        video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); border-radius: 13px; }
-        #sidebar { flex: 1; background: #161b22; border-radius: 15px; padding: 20px; overflow-y: auto; border: 1px solid #30363d; }
+
+        .main { display: flex; flex-direction: column; flex: 1; padding: 10px; gap: 10px; overflow-y: auto; }
+        
+        #video-box { width: 100%; aspect-ratio: 4/3; background: black; border-radius: 15px; position: relative; border: 2px solid #30363d; overflow: hidden; flex-shrink: 0; }
+        video { width: 100%; height: 100%; object-fit: cover; }
+        .mirror { transform: scaleX(-1); } /* Zrkadlenie len pre prednú kameru */
+
+        #sidebar { background: #161b22; border-radius: 15px; padding: 15px; border: 1px solid #30363d; flex: 1; }
+        
+        .res-text { font-size: 2em; color: #f1c40f; text-align: center; margin: 15px 0; font-weight: bold; min-height: 1.2em; }
+        
+        /* Mobilné ovládanie kamery */
+        .cam-controls { position: absolute; bottom: 10px; right: 10px; display: flex; gap: 10px; }
+        .circle-btn { width: 45px; height: 45px; border-radius: 50%; background: rgba(0,0,0,0.6); border: 1px solid white; color: white; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 20px; }
+
+        #modal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #161b22; padding: 20px; border-radius: 12px; border: 2px solid var(--accent); display: none; flex-direction: column; gap: 15px; z-index: 1000; width: 85%; max-width: 300px; box-shadow: 0 0 100px black; }
+        input { padding: 12px; background: #0d1117; color: white; border: 1px solid var(--accent); border-radius: 8px; font-size: 16px; }
+        
+        .btn-big { width: 100%; padding: 18px; border-radius: 10px; border: none; font-weight: bold; cursor: pointer; font-size: 1.1em; color: white; }
         .photo-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin-top: 10px; }
-        .photo-grid img { width: 100%; border-radius: 4px; border: 1px solid #444; }
-        #modal { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #161b22; padding: 25px; border-radius: 12px; border: 2px solid var(--accent); display: none; flex-direction: column; gap: 10px; z-index: 100; box-shadow: 0 0 50px black; }
-        .res-text { font-size: 2.5em; color: #f1c40f; text-align: center; margin: 20px 0; font-weight: bold; }
-        input { padding: 10px; background: #0d1117; color: white; border: 1px solid var(--accent); border-radius: 5px; }
+        .photo-grid img { width: 100%; aspect-ratio: 1/1; object-fit: cover; border-radius: 4px; border: 1px solid #444; }
+
+        @media (min-width: 768px) {
+            .main { flex-direction: row; }
+            #video-box { flex: 2; height: 100%; }
+        }
     </style>
 </head>
 <body>
 
 <nav>
     <button class="nav-btn active" onclick="setMode('test', this)">TESTOVANIE</button>
-    <button class="nav-btn" onclick="setMode('train', this)">TRÉNOVANIE & CLOUD</button>
+    <button class="nav-btn" onclick="setMode('train', this)">TRÉNOVANIE</button>
 </nav>
 
 <div class="main">
     <div id="video-box">
-        <video autoplay playsinline muted id="webcam"></video>
+        <video autoplay playsinline muted id="webcam" class="mirror"></video>
+        <div class="cam-controls">
+            <div class="circle-btn" onclick="switchCamera()">🔄</div>
+        </div>
+        
         <div id="modal">
-            <h3>Čo učíš túto AI?</h3>
-            <input type="text" id="obj-name" placeholder="Názov objektu">
-            <button onclick="uploadToCloud()" style="padding:10px; background:var(--success); color:white; border:none; cursor:pointer; font-weight:bold; border-radius:5px;">ULOŽIŤ PRE VŠETKÝCH</button>
-            <button onclick="closeModal()" style="padding:5px; background:transparent; color:gray; border:none; cursor:pointer;">Zrušiť</button>
+            <h3 style="margin:0">Uložiť do cloudu</h3>
+            <input type="text" id="obj-name" placeholder="Názov objektu...">
+            <button class="btn-big" style="background: var(--success);" onclick="uploadToCloud()">ULOŽIŤ</button>
+            <button onclick="closeModal()" style="background:transparent; color:gray; border:none; padding:5px;">Zrušiť</button>
         </div>
     </div>
 
     <div id="sidebar">
-        <div id="ui-test" style="display:block">
-            <h2>AI rozpoznáva:</h2>
+        <div id="ui-test">
+            <h2 style="margin:0; font-size: 1.2em; text-align:center">AI Rozpoznáva:</h2>
             <div id="test-result" class="res-text">Načítavam...</div>
         </div>
+        
         <div id="ui-train" style="display:none">
-            <button onclick="takePhoto()" style="width:100%; padding:15px; background:var(--accent); color:white; border:none; border-radius:8px; font-weight:bold; cursor:pointer">ODFOTIŤ NOVÝ OBJEKT</button>
-            <h3 style="margin-top:20px">Spoločná pamäť:</h3>
-            <input type="text" id="search" placeholder="Hľadať objekt v cloude..." oninput="refreshGallery()" style="width:100%; box-sizing:border-box">
+            <button class="btn-big" style="background: var(--accent);" onclick="takePhoto()">ODFOTIŤ OBJEKT</button>
+            <input type="text" id="search" placeholder="Hľadať v galérii..." oninput="refreshGallery()" style="width:100%; margin-top:20px; box-sizing:border-box">
             <div id="gallery" class="photo-grid"></div>
         </div>
     </div>
@@ -72,17 +98,33 @@
     
     let classifier = knnClassifier.create();
     let net;
+    let currentFacingMode = 'user'; // 'user' je predná, 'environment' je zadná
     const video = document.getElementById('webcam');
     let allData = {};
 
+    async function setupWebcam() {
+        if (video.srcObject) {
+            video.srcObject.getTracks().forEach(track => track.stop());
+        }
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+            video: { facingMode: currentFacingMode },
+            audio: false 
+        });
+        video.srcObject = stream;
+        // Zrkadlenie len pre prednú kameru
+        video.classList.toggle('mirror', currentFacingMode === 'user');
+    }
+
+    async function switchCamera() {
+        currentFacingMode = (currentFacingMode === 'user') ? 'environment' : 'user';
+        await setupWebcam();
+    }
+
     async function init() {
-        document.getElementById('test-result').innerText = "Otváram oči...";
+        document.getElementById('test-result').innerText = "Načítavam AI...";
         net = await tf.loadLayersModel('https://storage.googleapis.com/tfjs-models/tfjs/mobilenet_v1_0.25_224/model.json');
         
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-            video.srcObject = stream;
-        } catch (e) { alert("Chyba kamery!"); }
+        await setupWebcam();
 
         database.ref('ai_memory').on('value', async (snapshot) => {
             const data = snapshot.val();
@@ -90,9 +132,9 @@
                 allData = data;
                 await updateAIModel(data);
                 refreshGallery();
-                document.getElementById('test-result').innerText = "Hľadám...";
+                document.getElementById('test-result').innerText = "Pripravený";
             } else {
-                document.getElementById('test-result').innerText = "Pustá pamäť.";
+                document.getElementById('test-result').innerText = "Prázdna pamäť";
             }
         });
         predict();
@@ -101,8 +143,7 @@
     async function updateAIModel(data) {
         classifier.clearAllClasses();
         for (let label in data) {
-            const photos = Object.values(data[label]);
-            for (let imgBase64 of photos) {
+            for (let imgBase64 of Object.values(data[label])) {
                 const img = new Image();
                 img.src = imgBase64;
                 await new Promise(r => img.onload = r);
@@ -115,7 +156,13 @@
     function takePhoto() {
         const canvas = document.createElement('canvas');
         canvas.width = 224; canvas.height = 224;
-        canvas.getContext('2d').drawImage(video, 0, 0, 224, 224);
+        const ctx = canvas.getContext('2d');
+        // Ak je predná kamera, musíme zrkadliť aj fotku
+        if(currentFacingMode === 'user') {
+            ctx.translate(224, 0);
+            ctx.scale(-1, 1);
+        }
+        ctx.drawImage(video, 0, 0, 224, 224);
         window.currentSnap = canvas.toDataURL('image/jpeg', 0.6);
         video.pause();
         document.getElementById('modal').style.display = 'flex';
@@ -124,7 +171,7 @@
 
     function uploadToCloud() {
         const name = document.getElementById('obj-name').value.trim().toLowerCase();
-        if(!name) return alert("Musíš zadať meno!");
+        if(!name) return alert("Zadaj meno!");
         database.ref('ai_memory/' + name).push(window.currentSnap);
         closeModal();
     }
