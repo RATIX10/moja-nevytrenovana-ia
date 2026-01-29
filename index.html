@@ -2,78 +2,171 @@
 <html lang="sk">
 <head>
     <meta charset="UTF-8">
-    <title>AI Vision - Oprava Rozpoznávania</title>
+    <title>AI Vision - Globálna Pamäť</title>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/knn-classifier"></script>
     <style>
         :root { --bg: #0d1117; --panel: #161b22; --accent: #58a6ff; --success: #238636; }
-        body { margin: 0; background: var(--bg); color: white; font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; }
-        nav { background: var(--panel); padding: 15px; display: flex; gap: 15px; border-bottom: 2px solid var(--accent); }
-        .nav-btn { background: #30363d; border: 1px solid var(--accent); color: white; padding: 10px 20px; border-radius: 6px; cursor: pointer; }
+        body { margin: 0; background: var(--bg); color: white; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; height: 100vh; }
+        nav { background: var(--panel); padding: 15px; display: flex; gap: 15px; border-bottom: 2px solid var(--accent); justify-content: center; }
+        .nav-btn { background: #30363d; border: 1px solid var(--accent); color: white; padding: 10px 25px; border-radius: 6px; cursor: pointer; font-weight: bold; }
         .nav-btn.active { background: var(--accent); }
+        
         .main-content { display: flex; flex: 1; padding: 20px; gap: 20px; overflow: hidden; }
-        #video-section { flex: 2; background: black; border-radius: 15px; position: relative; border: 2px solid #30363d; }
-        video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); border-radius: 13px; }
-        #train-modal { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--panel); padding: 25px; border-radius: 12px; border: 2px solid var(--accent); display: none; flex-direction: column; gap: 15px; z-index: 100; width: 280px; }
-        #sidebar { flex: 1; background: var(--panel); border-radius: 15px; padding: 20px; border: 1px solid #30363d; overflow-y: auto; }
-        .mode-ui { display: none; }
-        .mode-ui.active { display: block; }
-        .btn-action { width: 100%; padding: 15px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; margin-bottom: 20px; }
-        .btn-train { background: var(--success); color: white; }
-        .result-text { font-size: 2.5em; color: #f1c40f; text-align: center; margin-top: 30px; font-weight: bold; }
-        .confidence-bar { font-size: 1em; color: #8b949e; text-align: center; margin-top: 10px; }
-        .search-box { background: #0d1117; padding: 15px; border-radius: 10px; margin-top: 20px; }
-        .search-box input { width: 100%; padding: 12px; box-sizing: border-box; background: #161b22; color: white; border: 1px solid var(--accent); border-radius: 5px; }
-        #gallery-preview img { max-width: 100%; border-radius: 8px; border: 2px solid var(--accent); display: none; margin-top: 10px; }
+        #video-section { flex: 1.5; background: black; border-radius: 15px; position: relative; border: 2px solid #30363d; overflow: hidden; }
+        video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+        
+        #sidebar { flex: 1; background: var(--panel); border-radius: 15px; padding: 20px; border: 1px solid #30363d; display: flex; flex-direction: column; overflow-y: auto; }
+        .mode-ui { display: none; flex-direction: column; height: 100%; }
+        .mode-ui.active { display: flex; }
+
+        /* Galéria fotiek */
+        .photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 10px; margin-top: 15px; background: #0d1117; padding: 10px; border-radius: 8px; }
+        .photo-grid img { width: 100%; border-radius: 4px; border: 1px solid var(--accent); }
+
+        #train-modal { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--panel); padding: 25px; border-radius: 12px; border: 2px solid var(--accent); display: none; flex-direction: column; gap: 15px; z-index: 100; width: 300px; box-shadow: 0 0 50px rgba(0,0,0,0.8); }
+        input { padding: 12px; background: #0d1117; color: white; border: 1px solid var(--accent); border-radius: 6px; }
+        .btn-action { width: 100%; padding: 15px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; margin-bottom: 10px; color: white; }
+        
+        .result-box { font-size: 2.5em; color: #f1c40f; text-align: center; margin: 20px 0; border: 2px dashed #444; padding: 20px; border-radius: 10px; }
     </style>
 </head>
 <body>
 
 <nav>
-    <button class="nav-btn active" onclick="setMode('test', this)">TESTOVANIE</button>
-    <button class="nav-btn" onclick="setMode('train', this)">TRÉNOVANIE</button>
+    <button class="nav-btn active" onclick="setMode('test', this)">TEST ROZPOZNÁVANIA</button>
+    <button class="nav-btn" onclick="setMode('train', this)">TRÉNOVANIE & GALÉRIA</button>
 </nav>
 
 <div class="main-content">
     <div id="video-section">
         <video autoplay playsinline muted id="webcam"></video>
         <div id="train-modal">
-            <h3>Čo je na fotke?</h3>
-            <input type="text" id="obj-name" placeholder="Napr. mobil" style="padding:10px; width:90%">
-            <button class="btn-action" style="background: var(--accent); color: white; margin-top:10px" onclick="confirmSave()">ULOŽIŤ</button>
+            <h3>Nové učenie</h3>
+            <input type="text" id="obj-name" placeholder="Názov (napr. mobil)">
+            <button class="btn-action" style="background: var(--success);" onclick="confirmSave()">ULOŽIŤ DO CLOUDU</button>
+            <button class="btn-action" style="background: #333;" onclick="closeModal()">ZRUŠIŤ</button>
         </div>
     </div>
 
     <div id="sidebar">
         <div id="ui-test" class="mode-ui active">
-            <h2>Hľadám objekty...</h2>
-            <div id="test-result" class="result-text">---</div>
-            <div id="confidence" class="confidence-bar">Pripravený...</div>
+            <h2>Aktuálne vidím:</h2>
+            <div id="test-result" class="result-box">---</div>
+            <p style="color: #8b949e; text-align: center;">AI porovnáva obraz so všetkými fotkami v databáze.</p>
         </div>
 
         <div id="ui-train" class="mode-ui">
             <h2>Trénovanie</h2>
-            <button class="btn-action btn-train" onclick="takePhoto()">ODFOTIŤ OBJEKT</button>
-            <div class="search-box">
-                <input type="text" id="search-input" placeholder="Hľadať v pamäti..." oninput="doSearch()">
-                <div id="gallery-preview"><img id="preview-img" src=""><p id="preview-label"></p></div>
-            </div>
+            <button class="btn-action" style="background: var(--accent);" onclick="takePhoto()">ODFOTIŤ OBJEKT</button>
+            
+            <h3 style="margin-top:20px">Prehliadač fotiek</h3>
+            <input type="text" id="search-input" placeholder="Hľadať objekt v galérii..." oninput="showPhotos()">
+            <div id="photo-display-label" style="margin-top:10px; color: var(--accent);"></div>
+            <div class="photo-grid" id="photo-list">
+                </div>
         </div>
     </div>
 </div>
+
+
 
 <script>
     let classifier = knnClassifier.create();
     let net;
     let video = document.getElementById('webcam');
-    let savedImages = {};
-    let tempAct = null;
-    let tempSnap = null;
+    let db = JSON.parse(localStorage.getItem('ai_database')) || {}; 
+    // V reálnej verzii by 'db' bol prepojený na Firebase
 
-    async function start() {
+    async function init() {
         net = await tf.loadLayersModel('https://storage.googleapis.com/tfjs-models/tfjs/mobilenet_v1_0.25_224/model.json');
         const stream = await navigator.mediaDevices.getUserMedia({ video: true });
         video.srcObject = stream;
+        
+        // Obnova "mozgu" z uloženej databázy pri štarte
+        loadMemory();
+        predictLoop();
+    }
+
+    function loadMemory() {
+        Object.keys(db).forEach(label => {
+            db[label].forEach(imgBase64 => {
+                const img = new Image();
+                img.src = imgBase64;
+                img.onload = () => {
+                    const tensor = tf.browser.fromPixels(img).resizeBilinear([224, 224]).expandDims(0).toFloat().div(127).sub(1);
+                    classifier.addExample(net.predict(tensor), label);
+                };
+            });
+        });
+    }
+
+    async function takePhoto() {
+        const canvas = document.createElement('canvas');
+        canvas.width = 224; canvas.height = 224;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, 224, 224);
+        window.lastSnap = canvas.toDataURL('image/jpeg');
+        
+        video.pause();
+        document.getElementById('train-modal').style.display = 'flex';
+        document.getElementById('obj-name').focus();
+    }
+
+    function confirmSave() {
+        const name = document.getElementById('obj-name').value.trim().toLowerCase();
+        if(!name) return;
+
+        if(!db[name]) db[name] = [];
+        db[name].push(window.lastSnap);
+        
+        // Uloženie do pamäte prehliadača (lokálne)
+        localStorage.setItem('ai_database', JSON.stringify(db));
+        
+        // Pridanie do aktívnej AI
+        const img = new Image();
+        img.src = window.lastSnap;
+        img.onload = () => {
+            const tensor = tf.browser.fromPixels(img).resizeBilinear([224, 224]).expandDims(0).toFloat().div(127).sub(1);
+            classifier.addExample(net.predict(tensor), name);
+            alert("Fotka uložená! Teraz ju uvidia všetci (simulované).");
+            closeModal();
+            showPhotos();
+        };
+    }
+
+    function showPhotos() {
+        const q = document.getElementById('search-input').value.trim().toLowerCase();
+        const list = document.getElementById('photo-list');
+        const label = document.getElementById('photo-display-label');
+        list.innerHTML = "";
+        
+        if(q && db[q]) {
+            label.innerText = `Nájdených ${db[q].length} fotiek pre "${q}":`;
+            db[q].forEach(src => {
+                const img = document.createElement('img');
+                img.src = src;
+                list.appendChild(img);
+            });
+        } else {
+            label.innerText = q ? "Žiadne fotky." : "Napíš názov na zobrazenie galérie.";
+        }
+    }
+
+    async function predictLoop() {
+        if(!video.paused && classifier.getNumClasses() > 0) {
+            const img = await tf.browser.fromPixels(video);
+            const processed = img.resizeBilinear([224, 224]).expandDims(0).toFloat().div(127).sub(1);
+            const res = await classifier.predictClass(net.predict(processed));
+            
+            if(res.confidences[res.label] > 0.5) {
+                document.getElementById('test-result').innerText = res.label;
+            } else {
+                document.getElementById('test-result').innerText = "???";
+            }
+            img.dispose();
+            processed.dispose();
+        }
         requestAnimationFrame(predictLoop);
     }
 
@@ -84,69 +177,9 @@
         document.getElementById('ui-' + mode).classList.add('active');
     }
 
-    async function takePhoto() {
-        const canvas = document.createElement('canvas');
-        canvas.width = video.videoWidth; canvas.height = video.videoHeight;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(video, 0, 0);
-        tempSnap = canvas.toDataURL('image/jpeg');
+    function closeModal() { document.getElementById('train-modal').style.display = 'none'; video.play(); }
 
-        const img = await tf.browser.fromPixels(video);
-        tempAct = net.predict(processImage(img));
-        
-        video.pause();
-        document.getElementById('train-modal').style.display = 'flex';
-        document.getElementById('obj-name').focus();
-    }
-
-    function confirmSave() {
-        let name = document.getElementById('obj-name').value.trim().toLowerCase();
-        if(!name) return;
-        classifier.addExample(tempAct, name);
-        savedImages[name] = tempSnap;
-        document.getElementById('train-modal').style.display = 'none';
-        document.getElementById('obj-name').value = "";
-        video.play();
-    }
-
-    function processImage(img) {
-        const size = Math.min(img.shape[0], img.shape[1]);
-        const centerHeight = img.shape[0] / 2;
-        const centerWidth = img.shape[1] / 2;
-        const beginHeight = centerHeight - (size / 2);
-        const beginWidth = centerWidth - (size / 2);
-        return img.slice([beginHeight, beginWidth, 0], [size, size, 3])
-                  .resizeBilinear([224, 224])
-                  .expandDims(0).toFloat().div(127).sub(1);
-    }
-
-    async function predictLoop() {
-        if(document.getElementById('ui-test').classList.contains('active') && classifier.getNumClasses() > 0 && !video.paused) {
-            const img = await tf.browser.fromPixels(video);
-            const activation = net.predict(processImage(img));
-            const res = await classifier.predictClass(activation);
-            
-            const conf = res.confidences[res.label] * 100;
-            if(conf > 30) { // Znížený prah na 30% pre lepšiu reakciu
-                document.getElementById('test-result').innerText = res.label;
-                document.getElementById('confidence').innerText = "Istota: " + conf.toFixed(0) + "%";
-            } else {
-                document.getElementById('test-result').innerText = "???";
-                document.getElementById('confidence').innerText = "Nízka istota...";
-            }
-            img.dispose();
-        }
-        requestAnimationFrame(predictLoop);
-    }
-
-    function doSearch() {
-        let q = document.getElementById('search-input').value.trim().toLowerCase();
-        let img = document.getElementById('preview-img');
-        if(q && savedImages[q]) { img.src = savedImages[q]; img.style.display = 'block'; }
-        else { img.style.display = 'none'; }
-    }
-
-    start();
+    init();
 </script>
 </body>
 </html>
