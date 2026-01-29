@@ -2,182 +2,169 @@
 <html lang="sk">
 <head>
     <meta charset="UTF-8">
-    <title>AI Vision - Globálna Pamäť</title>
+    <title>Moja Nevytrénovaná IA - Globálna Pamäť</title>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/knn-classifier"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
     <style>
-        :root { --bg: #0d1117; --panel: #161b22; --accent: #58a6ff; --success: #238636; }
-        body { margin: 0; background: var(--bg); color: white; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; height: 100vh; }
-        nav { background: var(--panel); padding: 15px; display: flex; gap: 15px; border-bottom: 2px solid var(--accent); justify-content: center; }
-        .nav-btn { background: #30363d; border: 1px solid var(--accent); color: white; padding: 10px 25px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        :root { --bg: #0d1117; --accent: #58a6ff; --success: #238636; }
+        body { margin: 0; background: var(--bg); color: white; font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; }
+        nav { background: #161b22; padding: 15px; display: flex; gap: 10px; border-bottom: 2px solid var(--accent); justify-content: center; }
+        .nav-btn { background: #30363d; border: 1px solid var(--accent); color: white; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; }
         .nav-btn.active { background: var(--accent); }
-        
-        .main-content { display: flex; flex: 1; padding: 20px; gap: 20px; overflow: hidden; }
-        #video-section { flex: 1.5; background: black; border-radius: 15px; position: relative; border: 2px solid #30363d; overflow: hidden; }
-        video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
-        
-        #sidebar { flex: 1; background: var(--panel); border-radius: 15px; padding: 20px; border: 1px solid #30363d; display: flex; flex-direction: column; overflow-y: auto; }
-        .mode-ui { display: none; flex-direction: column; height: 100%; }
-        .mode-ui.active { display: flex; }
-
-        /* Galéria fotiek */
-        .photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 10px; margin-top: 15px; background: #0d1117; padding: 10px; border-radius: 8px; }
-        .photo-grid img { width: 100%; border-radius: 4px; border: 1px solid var(--accent); }
-
-        #train-modal { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--panel); padding: 25px; border-radius: 12px; border: 2px solid var(--accent); display: none; flex-direction: column; gap: 15px; z-index: 100; width: 300px; box-shadow: 0 0 50px rgba(0,0,0,0.8); }
-        input { padding: 12px; background: #0d1117; color: white; border: 1px solid var(--accent); border-radius: 6px; }
-        .btn-action { width: 100%; padding: 15px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; margin-bottom: 10px; color: white; }
-        
-        .result-box { font-size: 2.5em; color: #f1c40f; text-align: center; margin: 20px 0; border: 2px dashed #444; padding: 20px; border-radius: 10px; }
+        .main { display: flex; flex: 1; padding: 20px; gap: 20px; overflow: hidden; }
+        #video-box { flex: 2; background: black; border-radius: 15px; position: relative; border: 2px solid #30363d; overflow: hidden; }
+        video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); border-radius: 13px; }
+        #sidebar { flex: 1; background: #161b22; border-radius: 15px; padding: 20px; overflow-y: auto; border: 1px solid #30363d; }
+        .photo-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin-top: 10px; }
+        .photo-grid img { width: 100%; border-radius: 4px; border: 1px solid #444; }
+        #modal { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #161b22; padding: 25px; border-radius: 12px; border: 2px solid var(--accent); display: none; flex-direction: column; gap: 10px; z-index: 100; box-shadow: 0 0 50px black; }
+        .res-text { font-size: 2.5em; color: #f1c40f; text-align: center; margin: 20px 0; font-weight: bold; }
+        input { padding: 10px; background: #0d1117; color: white; border: 1px solid var(--accent); border-radius: 5px; }
     </style>
 </head>
 <body>
 
 <nav>
-    <button class="nav-btn active" onclick="setMode('test', this)">TEST ROZPOZNÁVANIA</button>
-    <button class="nav-btn" onclick="setMode('train', this)">TRÉNOVANIE & GALÉRIA</button>
+    <button class="nav-btn active" onclick="setMode('test', this)">TESTOVANIE</button>
+    <button class="nav-btn" onclick="setMode('train', this)">TRÉNOVANIE & CLOUD</button>
 </nav>
 
-<div class="main-content">
-    <div id="video-section">
+<div class="main">
+    <div id="video-box">
         <video autoplay playsinline muted id="webcam"></video>
-        <div id="train-modal">
-            <h3>Nové učenie</h3>
-            <input type="text" id="obj-name" placeholder="Názov (napr. mobil)">
-            <button class="btn-action" style="background: var(--success);" onclick="confirmSave()">ULOŽIŤ DO CLOUDU</button>
-            <button class="btn-action" style="background: #333;" onclick="closeModal()">ZRUŠIŤ</button>
+        <div id="modal">
+            <h3>Čo učíš túto AI?</h3>
+            <input type="text" id="obj-name" placeholder="Názov objektu">
+            <button onclick="uploadToCloud()" style="padding:10px; background:var(--success); color:white; border:none; cursor:pointer; font-weight:bold; border-radius:5px;">ULOŽIŤ PRE VŠETKÝCH</button>
+            <button onclick="closeModal()" style="padding:5px; background:transparent; color:gray; border:none; cursor:pointer;">Zrušiť</button>
         </div>
     </div>
 
     <div id="sidebar">
-        <div id="ui-test" class="mode-ui active">
-            <h2>Aktuálne vidím:</h2>
-            <div id="test-result" class="result-box">---</div>
-            <p style="color: #8b949e; text-align: center;">AI porovnáva obraz so všetkými fotkami v databáze.</p>
+        <div id="ui-test" style="display:block">
+            <h2>AI rozpoznáva:</h2>
+            <div id="test-result" class="res-text">Načítavam...</div>
         </div>
-
-        <div id="ui-train" class="mode-ui">
-            <h2>Trénovanie</h2>
-            <button class="btn-action" style="background: var(--accent);" onclick="takePhoto()">ODFOTIŤ OBJEKT</button>
-            
-            <h3 style="margin-top:20px">Prehliadač fotiek</h3>
-            <input type="text" id="search-input" placeholder="Hľadať objekt v galérii..." oninput="showPhotos()">
-            <div id="photo-display-label" style="margin-top:10px; color: var(--accent);"></div>
-            <div class="photo-grid" id="photo-list">
-                </div>
+        <div id="ui-train" style="display:none">
+            <button onclick="takePhoto()" style="width:100%; padding:15px; background:var(--accent); color:white; border:none; border-radius:8px; font-weight:bold; cursor:pointer">ODFOTIŤ NOVÝ OBJEKT</button>
+            <h3 style="margin-top:20px">Spoločná pamäť:</h3>
+            <input type="text" id="search" placeholder="Hľadať objekt v cloude..." oninput="refreshGallery()" style="width:100%; box-sizing:border-box">
+            <div id="gallery" class="photo-grid"></div>
         </div>
     </div>
 </div>
 
-
-
 <script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyBojtyniuMTYlTGCvWNrKt-jeGLGGa4Mh4",
+        authDomain: "mojanevytrenovana-ia.firebaseapp.com",
+        databaseURL: "https://mojanevytrenovana-ia-default-rtdb.europe-west1.firebasedatabase.app",
+        projectId: "mojanevytrenovana-ia",
+        storageBucket: "mojanevytrenovana-ia.firebasestorage.app",
+        messagingSenderId: "1032274868821",
+        appId: "1:1032274868821:web:9ce396023dc4c15629b2dc"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+    
     let classifier = knnClassifier.create();
     let net;
-    let video = document.getElementById('webcam');
-    let db = JSON.parse(localStorage.getItem('ai_database')) || {}; 
-    // V reálnej verzii by 'db' bol prepojený na Firebase
+    const video = document.getElementById('webcam');
+    let allData = {};
 
     async function init() {
+        document.getElementById('test-result').innerText = "Otváram oči...";
         net = await tf.loadLayersModel('https://storage.googleapis.com/tfjs-models/tfjs/mobilenet_v1_0.25_224/model.json');
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        video.srcObject = stream;
         
-        // Obnova "mozgu" z uloženej databázy pri štarte
-        loadMemory();
-        predictLoop();
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            video.srcObject = stream;
+        } catch (e) { alert("Chyba kamery!"); }
+
+        database.ref('ai_memory').on('value', async (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                allData = data;
+                await updateAIModel(data);
+                refreshGallery();
+                document.getElementById('test-result').innerText = "Hľadám...";
+            } else {
+                document.getElementById('test-result').innerText = "Pustá pamäť.";
+            }
+        });
+        predict();
     }
 
-    function loadMemory() {
-        Object.keys(db).forEach(label => {
-            db[label].forEach(imgBase64 => {
+    async function updateAIModel(data) {
+        classifier.clearAllClasses();
+        for (let label in data) {
+            const photos = Object.values(data[label]);
+            for (let imgBase64 of photos) {
                 const img = new Image();
                 img.src = imgBase64;
-                img.onload = () => {
-                    const tensor = tf.browser.fromPixels(img).resizeBilinear([224, 224]).expandDims(0).toFloat().div(127).sub(1);
-                    classifier.addExample(net.predict(tensor), label);
-                };
-            });
-        });
-    }
-
-    async function takePhoto() {
-        const canvas = document.createElement('canvas');
-        canvas.width = 224; canvas.height = 224;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(video, 0, 0, 224, 224);
-        window.lastSnap = canvas.toDataURL('image/jpeg');
-        
-        video.pause();
-        document.getElementById('train-modal').style.display = 'flex';
-        document.getElementById('obj-name').focus();
-    }
-
-    function confirmSave() {
-        const name = document.getElementById('obj-name').value.trim().toLowerCase();
-        if(!name) return;
-
-        if(!db[name]) db[name] = [];
-        db[name].push(window.lastSnap);
-        
-        // Uloženie do pamäte prehliadača (lokálne)
-        localStorage.setItem('ai_database', JSON.stringify(db));
-        
-        // Pridanie do aktívnej AI
-        const img = new Image();
-        img.src = window.lastSnap;
-        img.onload = () => {
-            const tensor = tf.browser.fromPixels(img).resizeBilinear([224, 224]).expandDims(0).toFloat().div(127).sub(1);
-            classifier.addExample(net.predict(tensor), name);
-            alert("Fotka uložená! Teraz ju uvidia všetci (simulované).");
-            closeModal();
-            showPhotos();
-        };
-    }
-
-    function showPhotos() {
-        const q = document.getElementById('search-input').value.trim().toLowerCase();
-        const list = document.getElementById('photo-list');
-        const label = document.getElementById('photo-display-label');
-        list.innerHTML = "";
-        
-        if(q && db[q]) {
-            label.innerText = `Nájdených ${db[q].length} fotiek pre "${q}":`;
-            db[q].forEach(src => {
-                const img = document.createElement('img');
-                img.src = src;
-                list.appendChild(img);
-            });
-        } else {
-            label.innerText = q ? "Žiadne fotky." : "Napíš názov na zobrazenie galérie.";
+                await new Promise(r => img.onload = r);
+                const tensor = tf.browser.fromPixels(img).resizeBilinear([224, 224]).expandDims(0).toFloat().div(127).sub(1);
+                classifier.addExample(net.predict(tensor), label);
+            }
         }
     }
 
-    async function predictLoop() {
+    function takePhoto() {
+        const canvas = document.createElement('canvas');
+        canvas.width = 224; canvas.height = 224;
+        canvas.getContext('2d').drawImage(video, 0, 0, 224, 224);
+        window.currentSnap = canvas.toDataURL('image/jpeg', 0.6);
+        video.pause();
+        document.getElementById('modal').style.display = 'flex';
+        document.getElementById('obj-name').focus();
+    }
+
+    function uploadToCloud() {
+        const name = document.getElementById('obj-name').value.trim().toLowerCase();
+        if(!name) return alert("Musíš zadať meno!");
+        database.ref('ai_memory/' + name).push(window.currentSnap);
+        closeModal();
+    }
+
+    function refreshGallery() {
+        const q = document.getElementById('search').value.toLowerCase();
+        const gallery = document.getElementById('gallery');
+        gallery.innerHTML = "";
+        if (q && allData[q]) {
+            Object.values(allData[q]).forEach(src => {
+                const img = document.createElement('img');
+                img.src = src;
+                gallery.appendChild(img);
+            });
+        }
+    }
+
+    async function predict() {
         if(!video.paused && classifier.getNumClasses() > 0) {
             const img = await tf.browser.fromPixels(video);
             const processed = img.resizeBilinear([224, 224]).expandDims(0).toFloat().div(127).sub(1);
             const res = await classifier.predictClass(net.predict(processed));
-            
-            if(res.confidences[res.label] > 0.5) {
-                document.getElementById('test-result').innerText = res.label;
-            } else {
-                document.getElementById('test-result').innerText = "???";
-            }
-            img.dispose();
-            processed.dispose();
+            document.getElementById('test-result').innerText = res.confidences[res.label] > 0.55 ? res.label : "???";
+            img.dispose(); processed.dispose();
         }
-        requestAnimationFrame(predictLoop);
+        requestAnimationFrame(predict);
     }
 
     function setMode(mode, btn) {
         document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        document.querySelectorAll('.mode-ui').forEach(ui => ui.classList.remove('active'));
-        document.getElementById('ui-' + mode).classList.add('active');
+        document.getElementById('ui-test').style.display = mode === 'test' ? 'block' : 'none';
+        document.getElementById('ui-train').style.display = mode === 'train' ? 'block' : 'none';
     }
 
-    function closeModal() { document.getElementById('train-modal').style.display = 'none'; video.play(); }
+    function closeModal() {
+        document.getElementById('modal').style.display = 'none';
+        document.getElementById('obj-name').value = "";
+        video.play();
+    }
 
     init();
 </script>
