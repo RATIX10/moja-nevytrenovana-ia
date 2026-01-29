@@ -2,90 +2,84 @@
 <html lang="sk">
 <head>
     <meta charset="UTF-8">
-    <title>AI Vision - Search & Train</title>
+    <title>AI Vision - Opravené Vyhľadávanie</title>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/knn-classifier"></script>
     <style>
         :root {
-            --bg: #0d1117;
-            --panel: #161b22;
-            --accent: #58a6ff;
-            --success: #238636;
+            --bg: #0d1117; --panel: #161b22; --accent: #58a6ff; --success: #238636;
         }
-        body { margin: 0; background: var(--bg); color: white; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
+        body { margin: 0; background: var(--bg); color: white; font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; }
         
-        nav { background: var(--panel); padding: 15px 25px; display: flex; gap: 20px; border-bottom: 2px solid var(--accent); align-items: center; }
-        .nav-btn { background: transparent; border: 1px solid var(--accent); color: var(--accent); padding: 8px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; }
-        .nav-btn.active { background: var(--accent); color: white; }
+        nav { background: var(--panel); padding: 15px; display: flex; gap: 15px; border-bottom: 2px solid var(--accent); }
+        .nav-btn { background: #30363d; border: 1px solid var(--accent); color: white; padding: 10px 20px; border-radius: 6px; cursor: pointer; }
+        .nav-btn.active { background: var(--accent); }
 
-        .main-content { display: flex; height: calc(100vh - 70px); padding: 20px; gap: 20px; box-sizing: border-box; }
+        .main-content { display: flex; flex: 1; padding: 20px; gap: 20px; overflow: hidden; }
         
-        #video-container { flex: 2; background: black; border-radius: 15px; position: relative; border: 2px solid #30363d; display: flex; justify-content: center; align-items: center; }
+        #video-section { flex: 2; background: black; border-radius: 15px; position: relative; border: 2px solid #30363d; }
         video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); border-radius: 13px; }
 
+        /* Vyskakovacie okno pri fotení */
         #train-modal {
-            position: absolute; background: var(--panel); padding: 25px; border-radius: 12px;
-            border: 2px solid var(--accent); display: none; flex-direction: column; gap: 15px;
-            z-index: 100; box-shadow: 0 0 40px rgba(0,0,0,0.7); width: 280px;
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: var(--panel); padding: 25px; border-radius: 12px; border: 2px solid var(--accent);
+            display: none; flex-direction: column; gap: 15px; z-index: 100; width: 280px;
         }
-        #train-modal input { background: var(--bg); border: 1px solid #30363d; padding: 10px; color: white; border-radius: 5px; }
+        #train-modal input { padding: 10px; background: #0d1117; color: white; border: 1px solid #30363d; }
 
-        #side-panel { flex: 1; background: var(--panel); border-radius: 15px; padding: 25px; border: 1px solid #30363d; display: flex; flex-direction: column; overflow-y: auto; }
-        .mode-ui { display: none; flex-direction: column; height: 100%; }
-        .mode-ui.active { display: flex; }
+        #sidebar { flex: 1; background: var(--panel); border-radius: 15px; padding: 20px; border: 1px solid #30363d; overflow-y: auto; }
+        .mode-ui { display: none; }
+        .mode-ui.active { display: block; }
 
-        .result-display { font-size: 2.5em; text-align: center; margin: 40px 0; color: #f1c40f; font-weight: bold; }
-        .btn-action { padding: 15px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; font-size: 1.1em; margin-bottom: 10px; }
+        .btn-action { width: 100%; padding: 15px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; margin-bottom: 20px; }
         .btn-train { background: var(--success); color: white; }
 
-        /* Hľadanie a galéria */
-        .search-section { margin-top: 30px; border-top: 1px solid #333; padding-top: 20px; }
-        .search-input { width: 100%; padding: 12px; background: #0d1117; border: 1px solid #58a6ff; color: white; border-radius: 8px; box-sizing: border-box; }
+        /* SEKCE VYHĽADÁVANIA */
+        .search-box { background: #0d1117; padding: 15px; border-radius: 10px; border: 1px solid #30363d; margin-top: 20px; }
+        .search-box input { width: 100%; padding: 12px; box-sizing: border-box; background: #161b22; color: white; border: 1px solid var(--accent); border-radius: 5px; font-size: 1.1em; }
         #gallery-preview { margin-top: 15px; text-align: center; }
-        #gallery-preview img { max-width: 100%; border-radius: 10px; border: 2px solid var(--accent); display: none; }
-        #gallery-status { color: #8b949e; font-size: 0.9em; margin-top: 5px; }
-
-        h2 { margin-top: 0; color: var(--accent); }
+        #gallery-preview img { max-width: 100%; border-radius: 8px; border: 2px solid var(--accent); display: none; }
+        
+        .result-text { font-size: 2em; color: #f1c40f; text-align: center; margin-top: 50px; font-weight: bold; }
+        .list-info { color: #8b949e; font-size: 0.8em; margin-top: 10px; }
     </style>
 </head>
 <body>
 
 <nav>
-    <div style="font-weight: bold; font-size: 1.2em;">AI VISION</div>
-    <button id="btn-mode-test" class="nav-btn active" onclick="setMode('test')">TESTOVANIE</button>
-    <button id="btn-mode-train" class="nav-btn" onclick="setMode('train')">TRÉNOVANIE</button>
+    <button class="nav-btn active" onclick="setMode('test', this)">TESTOVANIE</button>
+    <button class="nav-btn" onclick="setMode('train', this)">TRÉNOVANIE</button>
 </nav>
 
 <div class="main-content">
-    <div id="video-container">
+    <div id="video-section">
         <video autoplay playsinline muted id="webcam"></video>
-        
         <div id="train-modal">
-            <h3>Čo je to?</h3>
-            <input type="text" id="obj-name" placeholder="Napr. Kniha">
-            <button class="btn-action" style="background: var(--accent); color: white;" onclick="confirmSave()">ULOŽIŤ DO PAMÄTE</button>
-            <button class="btn-action" style="background: #333; color: white;" onclick="cancelSnapshot()">ZRUŠIŤ</button>
+            <h3>Názov objektu</h3>
+            <input type="text" id="obj-name" placeholder="Napr. kniha">
+            <button class="btn-action" style="background: var(--accent); color: white;" onclick="confirmSave()">ULOŽIŤ</button>
         </div>
     </div>
 
-    <div id="side-panel">
+    <div id="sidebar">
         <div id="ui-test" class="mode-ui active">
-            <h2>Režim Testovania</h2>
-            <p>AI rozpoznáva objekty v reálnom čase.</p>
-            <div class="result-display" id="test-result">...</div>
+            <h2>Hľadám objekty...</h2>
+            <div id="test-result" class="result-text">---</div>
         </div>
 
         <div id="ui-train" class="mode-ui">
-            <h2>Režim Trénovania</h2>
-            <button class="btn-action btn-train" onclick="captureSnapshot()">ODFOTIŤ OBJEKT</button>
+            <h2>Trénovanie</h2>
+            <button class="btn-action btn-train" onclick="takePhoto()">ODFOTIŤ NOVÝ OBJEKT</button>
             
-            <div class="search-section">
+            <div class="search-box">
                 <h3>Vyhľadať v pamäti</h3>
-                <input type="text" class="search-input" id="search-obj" placeholder="Napíš názov objektu..." oninput="searchInGallery()">
+                <input type="text" id="search-input" placeholder="Zadaj názov (napr. mobil)" oninput="doSearch()">
                 <div id="gallery-preview">
-                    <img id="found-img" src="" alt="Nájdený objekt">
-                    <p id="gallery-status"></p>
+                    <img id="preview-img" src="">
+                    <p id="preview-label" style="color: #58a6ff;"></p>
                 </div>
+                <div class="list-info" id="known-list">Zatiaľ nepoznám žiadne objekty.</div>
             </div>
         </div>
     </div>
@@ -94,110 +88,89 @@
 <script>
     let classifier = knnClassifier.create();
     let net;
-    let currentMode = 'test';
-    let tempActivation = null;
-    let tempImageData = null;
-    const video = document.getElementById('webcam');
-    const savedPhotos = {}; // Tu ukladáme fotky: { "kniha": "data:image..." }
+    let video = document.getElementById('webcam');
+    let savedImages = {}; // Objekt pre fotky
+    let tempSnap = null;
+    let tempAct = null;
 
-    async function init() {
+    async function start() {
         net = await tf.loadLayersModel('https://storage.googleapis.com/tfjs-models/tfjs/mobilenet_v1_0.25_224/model.json');
         const stream = await navigator.mediaDevices.getUserMedia({ video: true });
         video.srcObject = stream;
-        setInterval(runPrediction, 200);
+        setInterval(predict, 250);
     }
 
-    function setMode(mode) {
-        currentMode = mode;
+    function setMode(mode, btn) {
         document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-        document.querySelectorAll('.mode-ui').forEach(m => m.classList.remove('active'));
-        
-        if(mode === 'test') {
-            document.getElementById('btn-mode-test').classList.add('active');
-            document.getElementById('ui-test').classList.add('active');
-        } else {
-            document.getElementById('btn-mode-train').classList.add('active');
-            document.getElementById('ui-train').classList.add('active');
-        }
+        btn.classList.add('active');
+        document.querySelectorAll('.mode-ui').forEach(ui => ui.classList.remove('active'));
+        document.getElementById('ui-' + mode).classList.add('active');
     }
 
-    async function captureSnapshot() {
-        // Vytvorenie fotky
+    async function takePhoto() {
+        // Vytvorenie fotky (vizuálnej)
         const canvas = document.createElement('canvas');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
+        canvas.width = video.videoWidth; canvas.height = video.videoHeight;
         const ctx = canvas.getContext('2d');
-        ctx.translate(video.videoWidth, 0);
-        ctx.scale(-1, 1);
         ctx.drawImage(video, 0, 0);
-        tempImageData = canvas.toDataURL('image/png');
+        tempSnap = canvas.toDataURL('image/jpeg');
 
         video.pause();
+        // Spracovanie pre AI
         const img = await tf.browser.fromPixels(video);
-        const centerHeight = img.shape[0] / 2;
-        const centerWidth = img.shape[1] / 2;
-        const processed = img.slice([centerHeight - 112, centerWidth - 112, 0], [224, 224, 3])
-                             .expandDims(0).toFloat().div(tf.scalar(127)).sub(tf.scalar(1));
-        
-        tempActivation = net.predict(processed);
+        const processed = img.resizeBilinear([224, 224]).expandDims(0).toFloat().div(127).sub(1);
+        tempAct = net.predict(processed);
+
         document.getElementById('train-modal').style.display = 'flex';
         document.getElementById('obj-name').focus();
     }
 
     function confirmSave() {
-        const name = document.getElementById('obj-name').value.trim().toLowerCase();
-        if(!name) return alert("Zadaj názov!");
+        let name = document.getElementById('obj-name').value.trim().toLowerCase();
+        if(!name) return;
+
+        classifier.addExample(tempAct, name);
+        savedImages[name] = tempSnap; // Uložíme fotku k názvu
         
-        classifier.addExample(tempActivation, name);
-        savedPhotos[name] = tempImageData; // Uloženie fotky do galérie
+        // Aktualizujeme zoznam názvov
+        document.getElementById('known-list').innerText = "Poznám: " + Object.keys(savedImages).join(", ");
         
-        closeModal();
-    }
-
-    function searchInGallery() {
-        const query = document.getElementById('search-obj').value.trim().toLowerCase();
-        const imgDisplay = document.getElementById('found-img');
-        const status = document.getElementById('gallery-status');
-
-        if (query && savedPhotos[query]) {
-            imgDisplay.src = savedPhotos[query];
-            imgDisplay.style.display = 'inline-block';
-            status.innerText = "Nájdený objekt: " + query;
-        } else {
-            imgDisplay.style.display = 'none';
-            status.innerText = query ? "Tento objekt nemám v pamäti." : "";
-        }
-    }
-
-    function cancelSnapshot() { closeModal(); }
-
-    function closeModal() {
         document.getElementById('train-modal').style.display = 'none';
         document.getElementById('obj-name').value = "";
         video.play();
     }
 
-    async function runPrediction() {
-        if(currentMode === 'test' && classifier.getNumClasses() > 0 && !video.paused) {
-            const img = await tf.browser.fromPixels(video);
-            const centerHeight = img.shape[0] / 2;
-            const centerWidth = img.shape[1] / 2;
-            const processed = img.slice([centerHeight - 112, centerWidth - 112, 0], [224, 224, 3])
-                                 .expandDims(0).toFloat().div(tf.scalar(127)).sub(tf.scalar(1));
-            
-            const activation = net.predict(processed);
-            const result = await classifier.predictClass(activation);
-            
-            if(result.confidences[result.label] > 0.6) {
-                document.getElementById('test-result').innerText = result.label;
-            } else {
-                document.getElementById('test-result').innerText = "???";
-            }
-            processed.dispose();
+    function doSearch() {
+        let q = document.getElementById('search-input').value.trim().toLowerCase();
+        let img = document.getElementById('preview-img');
+        let label = document.getElementById('preview-label');
+
+        if(q && savedImages[q]) {
+            img.src = savedImages[q];
+            img.style.display = 'block';
+            label.innerText = "Fotka pre: " + q;
+        } else {
+            img.style.display = 'none';
+            label.innerText = q ? "Nenájdené" : "";
         }
     }
 
-    init();
+    async function predict() {
+        if(document.getElementById('ui-test').classList.contains('active') && classifier.getNumClasses() > 0 && !video.paused) {
+            const img = await tf.browser.fromPixels(video);
+            const processed = img.resizeBilinear([224, 224]).expandDims(0).toFloat().div(127).sub(1);
+            const res = await classifier.predictClass(net.predict(processed));
+            
+            if(res.confidences[res.label] > 0.6) {
+                document.getElementById('test-result').innerText = res.label;
+            } else {
+                document.getElementById('test-result').innerText = "???";
+            }
+            img.dispose(); processed.dispose();
+        }
+    }
+
+    start();
 </script>
 </body>
 </html>
