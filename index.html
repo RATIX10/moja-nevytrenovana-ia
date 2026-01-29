@@ -2,180 +2,119 @@
 <html lang="sk">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Model - Veľké Rozhranie</title>
+    <title>AI Vision Trainer - Vidím a učím sa</title>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/knn-classifier"></script>
     <style>
-        :root {
-            --primary-color: #4A90E2;
-            --secondary-color: #f0f2f5;
-            --ai-bg: #ffffff;
-            --user-bg: #007bff;
-            --text-dark: #1c1e21;
-        }
-
-        body, html {
-            height: 100%;
-            margin: 0;
-            font-family: 'Roboto', sans-serif;
-            background: var(--secondary-color);
-        }
-
-        /* Celý kontajner na celú obrazovku */
-        .app-container {
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            width: 100%;
-            max-width: 1200px; /* Maximálna šírka pre desktopy */
-            margin: 0 auto;
-            background: white;
-            box-shadow: 0 0 20px rgba(0,0,0,0.1);
-        }
-
-        header {
-            background: var(--primary-color);
-            color: white;
-            padding: 25px;
-            text-align: center;
-        }
-
-        header h1 { margin: 0; font-size: 2.2em; }
-
-        /* Zväčšená plocha chatu */
-        #chat-box {
-            flex: 1;
-            padding: 30px;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-            background: #f9f9f9;
-        }
-
-        .message {
-            max-width: 70%;
-            padding: 20px 25px;
-            border-radius: 25px;
-            font-size: 1.2em; /* Väčšie písmo */
-            line-height: 1.5;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-        }
-
-        .ai {
-            align-self: flex-start;
-            background: var(--ai-bg);
-            color: var(--text-dark);
-            border: 1px solid #ddd;
-        }
-
-        .user {
-            align-self: flex-end;
-            background: var(--user-bg);
-            color: white;
-        }
-
-        /* Väčšia ovládacia lišta */
-        .controls {
-            padding: 30px;
-            background: white;
-            border-top: 2px solid #eee;
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
-
-        .input-row {
-            display: flex;
-            gap: 15px;
-        }
-
-        input {
-            padding: 18px;
-            font-size: 1.1em;
-            border: 2px solid #ddd;
-            border-radius: 12px;
-            outline: none;
-        }
-
-        #userInput { flex: 3; }
-        #targetInput { flex: 1; text-align: center; }
-
-        input:focus { border-color: var(--primary-color); }
-
-        button {
-            padding: 20px;
-            font-size: 1.3em;
-            font-weight: bold;
-            background: var(--primary-color);
-            color: white;
-            border: none;
-            border-radius: 12px;
-            cursor: pointer;
-            transition: 0.2s;
-        }
-
-        button:hover { background: #357ABD; transform: translateY(-2px); }
-        button:active { transform: translateY(0); }
-
-        #status { text-align: center; color: #777; font-weight: bold; }
+        body { margin: 0; background: #1a1a1a; color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; flex-direction: column; height: 100vh; }
+        header { padding: 20px; text-align: center; background: #252525; border-bottom: 3px solid #4A90E2; }
+        .main-container { display: flex; flex: 1; padding: 20px; gap: 20px; }
+        
+        /* Video okno */
+        #video-container { flex: 2; position: relative; background: black; border-radius: 15px; overflow: hidden; display: flex; justify-content: center; }
+        video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+        
+        /* Ovládací panel */
+        #controls { flex: 1; background: #2d2d2d; padding: 20px; border-radius: 15px; display: flex; flex-direction: column; gap: 15px; }
+        .class-btn { padding: 15px; font-size: 1.1em; cursor: pointer; border: none; border-radius: 8px; font-weight: bold; transition: 0.3s; }
+        .btn-blue { background: #4A90E2; color: white; }
+        .btn-red { background: #e74c3c; color: white; }
+        .btn-green { background: #2ecc71; color: white; }
+        
+        #prediction { font-size: 2em; text-align: center; color: #f1c40f; margin-top: 20px; padding: 10px; border: 2px dashed #f1c40f; border-radius: 10px; }
+        .status { color: #888; font-size: 0.9em; text-align: center; }
     </style>
 </head>
 <body>
 
-<div class="app-container">
-    <header>
-        <h1>AI Model Trainer Pro</h1>
-    </header>
+<header>
+    <h1>AI VISION: Nauč ma, čo vidím</h1>
+    <div class="status" id="status">Načítavam mozog AI...</div>
+</header>
 
-    <div id="chat-box">
-        <div class="message ai">
-            <strong>AI:</strong> Vitajte. Teraz som v "maxi" režime. Moje vnímanie je stále nevytrenované. Napíšte správu a priraďte jej hodnotu (0 až 1).
-        </div>
+<div class="main-container">
+    <div id="video-container">
+        <video autoplay playsinline muted id="webcam"></video>
     </div>
 
-    <div class="controls">
-        <div class="input-row">
-            <input type="text" id="userInput" placeholder="Zadaj text správy...">
-            <input type="number" id="targetInput" placeholder="Hodnota (0-1)" step="0.1" min="0" max="1">
-        </div>
-        <button onclick="trainAndPredict()">Odoslať a naučiť model</button>
-        <div id="status">Stav: Pripravený na dáta</div>
+    <div id="controls">
+        <h3>1. Ukáž objekt na kameru</h3>
+        <h3>2. Drž tlačidlo pre tréning:</h3>
+        
+        <button class="class-btn btn-blue" onmousedown="addExample(0)" onmouseup="stopTraining()">NAUČ: Objekt A (napr. Mobil)</button>
+        <button class="class-btn btn-red" onmousedown="addExample(1)" onmouseup="stopTraining()">NAUČ: Objekt B (napr. Ruka)</button>
+        <button class="class-btn btn-green" onmousedown="addExample(2)" onmouseup="stopTraining()">NAUČ: Pozadie (Nič)</button>
+
+        <div id="prediction">Čakám na dáta...</div>
+        <p class="status">Čím viac fotiek pridáš (držaním tlačidla), tým bude AI múdrejšia.</p>
     </div>
 </div>
 
 <script>
-    // Architektúra modelu (ostáva rovnaká, aby fungovala)
-    const model = tf.sequential();
-    model.add(tf.layers.dense({units: 16, activation: 'relu', inputShape: [1]}));
-    model.add(tf.layers.dense({units: 1, activation: 'sigmoid'}));
-    model.compile({optimizer: 'adam', loss: 'meanSquaredError'});
+    const webcamElement = document.getElementById('webcam');
+    const classifier = knnClassifier.create();
+    let net;
 
-    async function trainAndPredict() {
-        const text = document.getElementById('userInput').value;
-        const target = parseFloat(document.getElementById('targetInput').value);
-
-        if (!text || isNaN(target)) return;
-
-        const chatBox = document.getElementById('chat-box');
-        chatBox.innerHTML += `<div class="message user"><strong>Ty:</strong> ${text} <br><small>Cieľová hodnota: ${target}</small></div>`;
-
-        const inputTensor = tf.tensor2d([text.length], [1, 1]);
-        const targetTensor = tf.tensor2d([target], [1, 1]);
-
-        document.getElementById('status').innerText = "Trénujem...";
-        await model.fit(inputTensor, targetTensor, {epochs: 25});
-
-        const prediction = model.predict(inputTensor);
-        const val = (await prediction.data())[0];
-
-        chatBox.innerHTML += `<div class="message ai"><strong>AI:</strong> Odhad pre dĺžku ${text.length} je <strong>${val.toFixed(4)}</strong></div>`;
-        
-        document.getElementById('status').innerText = "Doučené!";
-        document.getElementById('userInput').value = "";
-        chatBox.scrollTop = chatBox.scrollHeight;
+    async function setupWebcam() {
+        return new Promise((resolve, reject) => {
+            const navigatorAny = navigator;
+            navigator.getUserMedia = navigator.getUserMedia || navigatorAny.webkitGetUserMedia || navigatorAny.mozGetUserMedia || navigatorAny.msGetUserMedia;
+            if (navigator.getUserMedia) {
+                navigator.getUserMedia({video: true},
+                    stream => { webcamElement.srcObject = stream; webcamElement.addEventListener('loadeddata', () => resolve(), false); },
+                    error => reject());
+            } else { reject(); }
+        });
     }
+
+    async function app() {
+        document.getElementById('status').innerText = "Načítavam MobileNet (oči AI)...";
+        net = await tf.loadLayersModel('https://storage.googleapis.com/tfjs-models/tfjs/mobilenet_v1_0.25_224/model.json');
+        document.getElementById('status').innerText = "Kamera aktívna. Môžeš začať trénovať!";
+
+        await setupWebcam();
+
+        while (true) {
+            if (classifier.getNumClasses() > 0) {
+                const img = await getImage();
+                const activation = net.predict(img);
+                const result = await classifier.predictClass(activation);
+
+                const classes = ['Objekt A', 'Objekt B', 'Pozadie'];
+                document.getElementById('prediction').innerText = classes[result.label];
+                
+                img.dispose();
+            }
+            await tf.nextFrame();
+        }
+    }
+
+    async function getImage() {
+        const img = await tf.browser.fromPixels(webcamElement);
+        const centerHeight = img.shape[0] / 2;
+        const beginHeight = centerHeight - (224 / 2);
+        const centerWidth = img.shape[1] / 2;
+        const beginWidth = centerWidth - (224 / 2);
+        return img.slice([beginHeight, beginWidth, 0], [224, 224, 3]).expandDims(0).toFloat().div(tf.scalar(127)).sub(tf.scalar(1));
+    }
+
+    let training = false;
+    async function addExample(classId) {
+        training = true;
+        while(training) {
+            const img = await getImage();
+            const activation = net.predict(img);
+            classifier.addExample(activation, classId);
+            img.dispose();
+            await tf.nextFrame();
+        }
+    }
+
+    function stopTraining() {
+        training = false;
+    }
+
+    app();
 </script>
 
 </body>
