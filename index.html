@@ -3,262 +3,180 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Môj Interaktívny AI Asistent (Trénovateľný)</title>
+    <title>AI Model - Veľké Rozhranie</title>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
     <style>
         :root {
             --primary-color: #4A90E2;
-            --secondary-color: #F8F8F8;
-            --text-color: #333;
-            --border-color: #E0E0E0;
-            --shadow-color: rgba(0, 0, 0, 0.05);
-            --ai-message-bg: #EAF3FF;
-            --user-message-bg: #DCF8C6;
+            --secondary-color: #f0f2f5;
+            --ai-bg: #ffffff;
+            --user-bg: #007bff;
+            --text-dark: #1c1e21;
         }
 
-        body {
+        body, html {
+            height: 100%;
+            margin: 0;
             font-family: 'Roboto', sans-serif;
             background: var(--secondary-color);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            margin: 0;
-            color: var(--text-color);
         }
 
-        .container {
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 10px 30px var(--shadow-color);
-            width: 90%;
-            max-width: 600px;
+        /* Celý kontajner na celú obrazovku */
+        .app-container {
             display: flex;
             flex-direction: column;
-            overflow: hidden;
-            min-height: 500px;
+            height: 100vh;
+            width: 100%;
+            max-width: 1200px; /* Maximálna šírka pre desktopy */
+            margin: 0 auto;
+            background: white;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
         }
 
-        h1 {
+        header {
             background: var(--primary-color);
             color: white;
-            padding: 20px;
-            margin: 0;
+            padding: 25px;
             text-align: center;
-            font-weight: 700;
-            font-size: 1.8em;
         }
 
+        header h1 { margin: 0; font-size: 2.2em; }
+
+        /* Zväčšená plocha chatu */
         #chat-box {
-            flex-grow: 1;
-            padding: 20px;
+            flex: 1;
+            padding: 30px;
             overflow-y: auto;
-            border-bottom: 1px solid var(--border-color);
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 20px;
+            background: #f9f9f9;
         }
 
         .message {
-            max-width: 80%;
-            padding: 10px 15px;
-            border-radius: 18px;
-            word-wrap: break-word;
-            line-height: 1.4;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+            max-width: 70%;
+            padding: 20px 25px;
+            border-radius: 25px;
+            font-size: 1.2em; /* Väčšie písmo */
+            line-height: 1.5;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
         }
 
-        .message.ai {
+        .ai {
             align-self: flex-start;
-            background-color: var(--ai-message-bg);
-            color: #2C3E50;
+            background: var(--ai-bg);
+            color: var(--text-dark);
+            border: 1px solid #ddd;
         }
 
-        .message.user {
+        .user {
             align-self: flex-end;
-            background-color: var(--user-message-bg);
-            color: #2C3E50;
+            background: var(--user-bg);
+            color: white;
         }
 
-        .message strong {
-            font-weight: 700;
-        }
-
+        /* Väčšia ovládacia lišta */
         .controls {
-            padding: 20px;
+            padding: 30px;
+            background: white;
+            border-top: 2px solid #eee;
             display: flex;
             flex-direction: column;
-            gap: 15px;
-            border-top: 1px solid var(--border-color);
+            gap: 20px;
         }
 
-        .input-group {
+        .input-row {
             display: flex;
-            gap: 10px;
-            align-items: center;
+            gap: 15px;
         }
 
-        .input-group input[type="text"] {
-            flex-grow: 1;
-            padding: 12px;
-            border: 1px solid var(--border-color);
-            border-radius: 25px;
-            font-size: 1em;
+        input {
+            padding: 18px;
+            font-size: 1.1em;
+            border: 2px solid #ddd;
+            border-radius: 12px;
+            outline: none;
         }
 
-        .input-group input[type="number"] {
-            width: 120px;
-            padding: 12px;
-            border: 1px solid var(--border-color);
-            border-radius: 25px;
-            font-size: 1em;
-            text-align: center;
-        }
-        
+        #userInput { flex: 3; }
+        #targetInput { flex: 1; text-align: center; }
+
+        input:focus { border-color: var(--primary-color); }
+
         button {
+            padding: 20px;
+            font-size: 1.3em;
+            font-weight: bold;
             background: var(--primary-color);
             color: white;
-            padding: 12px 20px;
             border: none;
-            border-radius: 25px;
-            font-size: 1em;
-            font-weight: 700;
+            border-radius: 12px;
             cursor: pointer;
-            transition: background 0.3s ease;
+            transition: 0.2s;
         }
 
-        button:hover {
-            background: #3A7CDA;
-        }
+        button:hover { background: #357ABD; transform: translateY(-2px); }
+        button:active { transform: translateY(0); }
 
-        #status {
-            text-align: center;
-            font-size: 0.9em;
-            color: #666;
-            margin-top: 10px;
-        }
-
-        @media (max-width: 768px) {
-            .container {
-                width: 100%;
-                margin: 0;
-                border-radius: 0;
-                min-height: 100vh;
-            }
-            h1 {
-                font-size: 1.5em;
-                padding: 15px;
-            }
-            .input-group {
-                flex-direction: column;
-                gap: 10px;
-            }
-            .input-group input[type="number"] {
-                width: 100%;
-            }
-        }
+        #status { text-align: center; color: #777; font-weight: bold; }
     </style>
 </head>
 <body>
 
-    <div class="container">
-        <h1>Môj Interaktívny AI Asistent</h1>
-        
-        <div id="chat-box">
-            <div class="message ai">
-                <strong>AI:</strong> Ahoj! Som nevytrenovaný model. Napíš niečo a potom ma nauč, či je to "dobré" (blízko k 1) alebo "zlé" (blízko k 0) zadaním čísla. Môžeš použiť aj iné čísla!
-            </div>
-        </div>
+<div class="app-container">
+    <header>
+        <h1>AI Model Trainer Pro</h1>
+    </header>
 
-        <div class="controls">
-            <div class="input-group">
-                <input type="text" id="userInput" placeholder="Napíš správu pre AI...">
-                <input type="number" id="targetInput" placeholder="Správna hodnota (napr. 0.5)" step="0.01" min="0" max="1">
-            </div>
-            <button onclick="trainAndPredict()">Odoslať a Trénovať</button>
-            <div id="status">Stav: Model je pripravený.</div>
+    <div id="chat-box">
+        <div class="message ai">
+            <strong>AI:</strong> Vitajte. Teraz som v "maxi" režime. Moje vnímanie je stále nevytrenované. Napíšte správu a priraďte jej hodnotu (0 až 1).
         </div>
     </div>
 
-    <script>
-        // 1. Definícia nevytrenovaného modelu
-        const model = tf.sequential();
-        model.add(tf.layers.dense({units: 8, activation: 'relu', inputShape: [1]})); // Vstup je dĺžka textu
-        model.add(tf.layers.dense({units: 1, activation: 'sigmoid'})); // Výstup je jedno číslo medzi 0 a 1
-        
-        model.compile({
-            optimizer: 'adam', 
-            loss: 'meanSquaredError' // Stratová funkcia pre regresiu
-        });
+    <div class="controls">
+        <div class="input-row">
+            <input type="text" id="userInput" placeholder="Zadaj text správy...">
+            <input type="number" id="targetInput" placeholder="Hodnota (0-1)" step="0.1" min="0" max="1">
+        </div>
+        <button onclick="trainAndPredict()">Odoslať a naučiť model</button>
+        <div id="status">Stav: Pripravený na dáta</div>
+    </div>
+</div>
+
+<script>
+    // Architektúra modelu (ostáva rovnaká, aby fungovala)
+    const model = tf.sequential();
+    model.add(tf.layers.dense({units: 16, activation: 'relu', inputShape: [1]}));
+    model.add(tf.layers.dense({units: 1, activation: 'sigmoid'}));
+    model.compile({optimizer: 'adam', loss: 'meanSquaredError'});
+
+    async function trainAndPredict() {
+        const text = document.getElementById('userInput').value;
+        const target = parseFloat(document.getElementById('targetInput').value);
+
+        if (!text || isNaN(target)) return;
 
         const chatBox = document.getElementById('chat-box');
-        const statusDiv = document.getElementById('status');
-        const userInput = document.getElementById('userInput');
-        const targetInput = document.getElementById('targetInput');
+        chatBox.innerHTML += `<div class="message user"><strong>Ty:</strong> ${text} <br><small>Cieľová hodnota: ${target}</small></div>`;
 
-        async function trainAndPredict() {
-            const text = userInput.value.trim();
-            const target = parseFloat(targetInput.value);
+        const inputTensor = tf.tensor2d([text.length], [1, 1]);
+        const targetTensor = tf.tensor2d([target], [1, 1]);
 
-            if (text === "" || isNaN(target)) {
-                alert("Prosím, zadaj správu aj číselnú hodnotu pre tréning!");
-                return;
-            }
+        document.getElementById('status').innerText = "Trénujem...";
+        await model.fit(inputTensor, targetTensor, {epochs: 25});
 
-            // Pridanie správy používateľa do chatu
-            const userMessageDiv = document.createElement('div');
-            userMessageDiv.classList.add('message', 'user');
-            userMessageDiv.innerHTML = `<strong>Ty:</strong> ${text} (Cieľ: ${target.toFixed(2)})`;
-            chatBox.appendChild(userMessageDiv);
+        const prediction = model.predict(inputTensor);
+        const val = (await prediction.data())[0];
 
-            // Prevod textu na číslo (dĺžka textu) - toto je to, čo sa model učí
-            const inputTensor = tf.tensor2d([text.length], [1, 1]);
-            const targetTensor = tf.tensor2d([target], [1, 1]);
+        chatBox.innerHTML += `<div class="message ai"><strong>AI:</strong> Odhad pre dĺžku ${text.length} je <strong>${val.toFixed(4)}</strong></div>`;
+        
+        document.getElementById('status').innerText = "Doučené!";
+        document.getElementById('userInput').value = "";
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+</script>
 
-            statusDiv.innerText = "Stav: Trénujem sa...";
-            userInput.disabled = true;
-            targetInput.disabled = true;
-            document.querySelector('button').disabled = true;
-
-            // 2. Trénovanie "za pochodu" (20 cyklov pri každom odoslaní)
-            await model.fit(inputTensor, targetTensor, {epochs: 20, verbose: 0}); // verbose: 0 aby nebola konzola zahltená
-
-            // 3. Predpoveď po natrénovaní
-            const prediction = model.predict(inputTensor);
-            const predictedValue = (await prediction.data())[0];
-
-            const aiMessageDiv = document.createElement('div');
-            aiMessageDiv.classList.add('message', 'ai');
-            aiMessageDiv.innerHTML = `<strong>AI Odpoveď:</strong> Pre túto dĺžku textu je môj odhad: ${predictedValue.toFixed(4)}`;
-            chatBox.appendChild(aiMessageDiv);
-
-            statusDiv.innerText = "Stav: Doučené!";
-            
-            // Vyčistenie polí a skrolovanie dolu
-            userInput.value = "";
-            targetInput.value = "";
-            userInput.disabled = false;
-            targetInput.disabled = false;
-            document.querySelector('button').disabled = false;
-            userInput.focus(); // Zameranie na pole pre nový vstup
-            chatBox.scrollTop = chatBox.scrollHeight;
-        }
-
-        // Umožňuje odoslanie stlačením Enter v input poli
-        userInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                trainAndPredict();
-            }
-        });
-        targetInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                trainAndPredict();
-            }
-        });
-
-        // Počiatočné zameranie na pole
-        window.onload = () => userInput.focus();
-    </script>
 </body>
 </html>
