@@ -2,157 +2,179 @@
 <html lang="sk">
 <head>
     <meta charset="UTF-8">
-    <title>AI Vision Trainer - Manuálne učenie</title>
+    <title>AI Vision - Test & Train</title>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/knn-classifier"></script>
     <style>
-        body { margin: 0; background: #0d1117; color: white; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; height: 100vh; }
-        header { padding: 20px; text-align: center; background: #161b22; border-bottom: 2px solid #58a6ff; }
-        
-        .container { display: flex; flex: 1; padding: 20px; gap: 20px; overflow: hidden; }
-        
-        /* Video a náhľad */
-        #view-section { flex: 2; position: relative; background: #000; border-radius: 15px; display: flex; justify-content: center; align-items: center; overflow: hidden; border: 2px solid #30363d; }
-        video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
-        canvas { display: none; } /* Skrytý canvas pre fotenie */
-
-        /* Dialogové okno (vyskakovacie) */
-        #training-dialog { 
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: #161b22; padding: 30px; border-radius: 15px; border: 2px solid #58a6ff;
-            display: none; flex-direction: column; gap: 15px; z-index: 100; box-shadow: 0 0 50px rgba(0,0,0,0.8);
-            width: 300px;
+        :root {
+            --bg: #0d1117;
+            --panel: #161b22;
+            --accent: #58a6ff;
+            --success: #238636;
+            --danger: #da3633;
         }
-        #training-dialog input { padding: 12px; border-radius: 8px; border: 1px solid #30363d; background: #0d1117; color: white; font-size: 1em; }
+        body { margin: 0; background: var(--bg); color: white; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
         
-        /* Ovládanie */
-        #sidebar { flex: 1; background: #161b22; padding: 20px; border-radius: 15px; display: flex; flex-direction: column; gap: 20px; border: 1px solid #30363d; }
-        .btn { padding: 15px; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; font-size: 1.1em; transition: 0.2s; }
-        .btn-train { background: #238636; color: white; width: 100%; }
-        .btn-save { background: #58a6ff; color: white; }
-        .btn-clear { background: #da3633; color: white; margin-top: auto; }
-        .btn:hover { opacity: 0.8; transform: scale(1.02); }
+        /* Navigácia */
+        nav { background: var(--panel); padding: 15px 25px; display: flex; gap: 20px; border-bottom: 2px solid var(--accent); align-items: center; }
+        .nav-btn { background: transparent; border: 1px solid var(--accent); color: var(--accent); padding: 8px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        .nav-btn.active { background: var(--accent); color: white; }
+        .status-dot { width: 10px; height: 10px; border-radius: 50%; background: #444; margin-left: auto; }
+        .online { background: #3fb950; box-shadow: 0 0 10px #3fb950; }
 
-        #result-box { font-size: 1.8em; text-align: center; padding: 20px; background: #0d1117; border-radius: 10px; border: 1px dashed #58a6ff; color: #f1c40f; }
+        /* Hlavný obsah */
+        .main-content { display: flex; height: calc(100vh - 70px); padding: 20px; gap: 20px; box-sizing: border-box; }
+        
+        /* Video Sekcia */
+        #video-container { flex: 2; background: black; border-radius: 15px; position: relative; border: 2px solid #30363d; display: flex; justify-content: center; align-items: center; }
+        video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); border-radius: 13px; }
+
+        /* Dialógové okno tréningu */
+        #train-modal {
+            position: absolute; background: var(--panel); padding: 25px; border-radius: 12px;
+            border: 2px solid var(--accent); display: none; flex-direction: column; gap: 15px;
+            z-index: 100; box-shadow: 0 0 40px rgba(0,0,0,0.7); width: 280px;
+        }
+        #train-modal input { background: var(--bg); border: 1px solid #30363d; padding: 10px; color: white; border-radius: 5px; }
+
+        /* Bočný panel */
+        #side-panel { flex: 1; background: var(--panel); border-radius: 15px; padding: 25px; border: 1px solid #30363d; display: flex; flex-direction: column; }
+        .mode-ui { display: none; flex-direction: column; height: 100%; }
+        .mode-ui.active { display: flex; }
+
+        .result-display { font-size: 2.5em; text-align: center; margin: 40px 0; color: #f1c40f; font-weight: bold; }
+        .btn-action { padding: 15px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; font-size: 1.1em; margin-bottom: 10px; }
+        .btn-train { background: var(--success); color: white; }
+        .btn-clear { background: var(--danger); color: white; margin-top: auto; }
+
+        h2 { margin-top: 0; color: var(--accent); }
     </style>
 </head>
 <body>
 
-<header>
-    <h1>AI VISION TRAINER PRO</h1>
-    <div id="status">Načítavam systém...</div>
-</header>
+<nav>
+    <div style="font-weight: bold; font-size: 1.2em;">AI VISION</div>
+    <button id="btn-mode-test" class="nav-btn active" onclick="setMode('test')">TESTOVANIE</button>
+    <button id="btn-mode-train" class="nav-btn" onclick="setMode('train')">TRÉNOVANIE</button>
+    <div id="status-dot" class="status-dot"></div>
+</nav>
 
-<div class="container">
-    <div id="view-section">
+<div class="main-content">
+    <div id="video-container">
         <video autoplay playsinline muted id="webcam"></video>
         
-        <div id="training-dialog">
-            <h2 style="margin:0">Čo je na fotke?</h2>
-            <p style="font-size: 0.9em; color: #8b949e;">AI si práve uložila tento snímok.</p>
-            <input type="text" id="object-name" placeholder="Názov objektu (napr. Kniha)">
-            <button class="btn btn-save" onclick="saveToAI()">ULOŽIŤ DO PAMÄTE</button>
-            <button class="btn" style="background: #30363d; color: white;" onclick="cancelTraining()">ZRUŠIŤ</button>
+        <div id="train-modal">
+            <h3>Názov objektu</h3>
+            <input type="text" id="obj-name" placeholder="Napr. Kniha, Mobil...">
+            <button class="btn-action" style="background: var(--accent); color: white;" onclick="confirmSave()">ULOŽIŤ FOTKU</button>
+            <button class="btn-action" style="background: #333; color: white;" onclick="cancelSnapshot()">ZRUŠIŤ</button>
         </div>
     </div>
 
-    <div id="sidebar">
-        <h3>1. Učenie</h3>
-        <button class="btn btn-train" onclick="takeSnapshot()">ODFOŤ A NAUČ</button>
-        
-        <h3>2. Rozpoznávanie</h3>
-        <div id="result-box">Nič nevidím...</div>
-        
-        <div id="info" style="font-size: 0.8em; color: #8b949e;">Počet naučených objektov: 0</div>
-        
-        <button class="btn btn-clear" onclick="clearAI()">VYMAZAŤ VŠETKY FOTKY</button>
+    <div id="side-panel">
+        <div id="ui-test" class="mode-ui active">
+            <h2>Režim Testovania</h2>
+            <p>AI sleduje kameru a hľadá naučené objekty.</p>
+            <div class="result-display" id="test-result">...</div>
+        </div>
+
+        <div id="ui-train" class="mode-ui">
+            <h2>Režim Trénovania</h2>
+            <p>Klikni na tlačidlo nižšie, keď budeš pripravený odfotiť objekt.</p>
+            <button class="btn-action btn-train" onclick="captureSnapshot()">ODFOTIŤ OBJEKT</button>
+            <div id="count-info" style="margin-top: 10px; color: #8b949e;">Počet tried: 0</div>
+            
+            <button class="btn-action btn-clear" onclick="resetAI()">VYMAZAŤ CELÚ AI</button>
+        </div>
     </div>
 </div>
 
-<canvas id="snapshot-canvas" width="224" height="224"></canvas>
-
 <script>
-    const video = document.getElementById('webcam');
-    const classifier = knnClassifier.create();
+    let classifier = knnClassifier.create();
     let net;
+    let currentMode = 'test';
     let tempActivation = null;
+    const video = document.getElementById('webcam');
 
     async function init() {
-        document.getElementById('status').innerText = "Sťahujem neurónovú sieť...";
         net = await tf.loadLayersModel('https://storage.googleapis.com/tfjs-models/tfjs/mobilenet_v1_0.25_224/model.json');
-        
         const stream = await navigator.mediaDevices.getUserMedia({ video: true });
         video.srcObject = stream;
-        document.getElementById('status').innerText = "Systém pripravený.";
+        document.getElementById('status-dot').classList.add('online');
         
-        // Slučka pre rozpoznávanie
-        setInterval(predict, 200);
+        // Slučka pre predikciu (beží stále na pozadí)
+        setInterval(runPrediction, 200);
     }
 
-    async function takeSnapshot() {
-        // Zastavenie videa pre efekt "fotky"
-        video.pause();
+    function setMode(mode) {
+        currentMode = mode;
+        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.mode-ui').forEach(m => m.classList.remove('active'));
         
-        const img = await tf.browser.fromPixels(video);
-        const centerHeight = img.shape[0] / 2;
-        const centerWidth = img.shape[1] / 2;
-        const processedImg = img.slice([centerHeight - 112, centerWidth - 112, 0], [224, 224, 3])
-                                .expandDims(0).toFloat().div(tf.scalar(127)).sub(tf.scalar(1));
-        
-        tempActivation = net.predict(processedImg);
-        
-        // Zobrazenie okna
-        document.getElementById('training-dialog').style.display = 'flex';
-        document.getElementById('object-name').focus();
-    }
-
-    function saveToAI() {
-        const name = document.getElementById('object-name').value;
-        if (!name) return alert("Musíš zadať názov!");
-
-        // Pridanie do classifiera (tu by v reálnej aplikácii bolo ID, použijeme meno ako label)
-        classifier.addExample(tempActivation, name);
-        
-        document.getElementById('info').innerText = "Počet naučených kategórií: " + classifier.getNumClasses();
-        
-        closeDialog();
-    }
-
-    function cancelTraining() {
-        closeDialog();
-    }
-
-    function closeDialog() {
-        document.getElementById('training-dialog').style.display = 'none';
-        document.getElementById('object-name').value = "";
-        video.play();
-    }
-
-    async function predict() {
-        if (classifier.getNumClasses() > 0 && video.paused === false) {
-            const img = await tf.browser.fromPixels(video);
-            const centerHeight = img.shape[0] / 2;
-            const centerWidth = img.shape[1] / 2;
-            const processedImg = img.slice([centerHeight - 112, centerWidth - 112, 0], [224, 224, 3])
-                                    .expandDims(0).toFloat().div(tf.scalar(127)).sub(tf.scalar(1));
-
-            const activation = net.predict(processedImg);
-            const result = await classifier.predictClass(activation);
-            
-            if (result.confidences[result.label] > 0.5) {
-                document.getElementById('result-box').innerText = "Vidím: " + result.label;
-            } else {
-                document.getElementById('result-box').innerText = "Hľadám...";
-            }
-            processedImg.dispose();
+        if(mode === 'test') {
+            document.getElementById('btn-mode-test').classList.add('active');
+            document.getElementById('ui-test').classList.add('active');
+        } else {
+            document.getElementById('btn-mode-train').classList.add('active');
+            document.getElementById('ui-train').classList.add('active');
         }
     }
 
-    function clearAI() {
-        if(confirm("Naozaj vymazať celú pamäť AI?")) {
+    async function captureSnapshot() {
+        video.pause();
+        const img = await tf.browser.fromPixels(video);
+        const centerHeight = img.shape[0] / 2;
+        const centerWidth = img.shape[1] / 2;
+        const processed = img.slice([centerHeight - 112, centerWidth - 112, 0], [224, 224, 3])
+                             .expandDims(0).toFloat().div(tf.scalar(127)).sub(tf.scalar(1));
+        
+        tempActivation = net.predict(processed);
+        document.getElementById('train-modal').style.display = 'flex';
+        document.getElementById('obj-name').focus();
+    }
+
+    function confirmSave() {
+        const name = document.getElementById('obj-name').value;
+        if(!name) return alert("Zadaj názov!");
+        
+        classifier.addExample(tempActivation, name);
+        document.getElementById('count-info').innerText = "Počet tried: " + classifier.getNumClasses();
+        closeModal();
+    }
+
+    function cancelSnapshot() { closeModal(); }
+
+    function closeModal() {
+        document.getElementById('train-modal').style.display = 'none';
+        document.getElementById('obj-name').value = "";
+        video.play();
+    }
+
+    async function runPrediction() {
+        if(currentMode === 'test' && classifier.getNumClasses() > 0 && !video.paused) {
+            const img = await tf.browser.fromPixels(video);
+            const centerHeight = img.shape[0] / 2;
+            const centerWidth = img.shape[1] / 2;
+            const processed = img.slice([centerHeight - 112, centerWidth - 112, 0], [224, 224, 3])
+                                 .expandDims(0).toFloat().div(tf.scalar(127)).sub(tf.scalar(1));
+            
+            const activation = net.predict(processed);
+            const result = await classifier.predictClass(activation);
+            
+            if(result.confidences[result.label] > 0.6) {
+                document.getElementById('test-result').innerText = result.label;
+            } else {
+                document.getElementById('test-result').innerText = "???";
+            }
+            processed.dispose();
+        }
+    }
+
+    function resetAI() {
+        if(confirm("Vymazať všetko?")) {
             classifier.clearAllClasses();
-            document.getElementById('info').innerText = "Počet naučených objektov: 0";
-            document.getElementById('result-box').innerText = "Pamäť prázdna.";
+            document.getElementById('count-info').innerText = "Počet tried: 0";
+            document.getElementById('test-result').innerText = "...";
         }
     }
 
