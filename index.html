@@ -3,76 +3,72 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Globálna AI - Kto to odfotil?</title>
+    <title>Verejná AI Pamäť</title>
     
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/knn-classifier"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/knn-classifier"></script>
 
     <style>
-        :root { --bg: #0d1117; --accent: #58a6ff; --success: #238636; }
+        :root { --bg: #0d1117; --accent: #58a6ff; --success: #238636; --card: #161b22; }
         body { margin: 0; background: var(--bg); color: white; font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
         
-        nav { background: #161b22; padding: 10px; display: flex; gap: 8px; border-bottom: 2px solid var(--accent); }
-        .nav-btn { flex: 1; background: #30363d; border: 1px solid var(--accent); color: white; padding: 12px 5px; border-radius: 8px; cursor: pointer; font-weight: bold; }
-        .nav-btn.active { background: var(--accent); }
+        nav { background: var(--card); padding: 10px; display: flex; gap: 8px; border-bottom: 1px solid #30363d; }
+        .nav-btn { flex: 1; background: #21262d; color: white; border: 1px solid #30363d; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        .nav-btn.active { background: var(--accent); border-color: var(--accent); }
 
-        .main { display: flex; flex-direction: column; flex: 1; padding: 10px; gap: 10px; overflow-y: auto; }
-        
-        #video-box { width: 100%; aspect-ratio: 4/3; background: black; border-radius: 15px; position: relative; border: 2px solid #30363d; overflow: hidden; }
+        .main { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 15px; }
+        #video-container { width: 100%; aspect-ratio: 1/1; background: black; border-radius: 15px; overflow: hidden; position: relative; border: 2px solid #30363d; }
         video { width: 100%; height: 100%; object-fit: cover; }
         .mirror { transform: scaleX(-1); }
 
-        #sidebar { background: #161b22; border-radius: 15px; padding: 15px; border: 1px solid #30363d; }
-        .res-text { font-size: 2em; color: #f1c40f; text-align: center; margin: 10px 0; font-weight: bold; }
-        
-        /* Galéria s menami */
-        .photo-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 10px; }
-        .photo-card { background: #0d1117; border-radius: 8px; border: 1px solid #333; overflow: hidden; padding-bottom: 5px; }
-        .photo-card img { width: 100%; aspect-ratio: 1/1; object-fit: cover; }
-        .photo-card .author { font-size: 0.75em; text-align: center; color: #8b949e; padding: 2px; }
+        .res-box { background: var(--card); padding: 20px; border-radius: 12px; text-align: center; border: 1px solid #30363d; }
+        .res-text { font-size: 2.5rem; font-weight: bold; color: #f1c40f; margin: 5px 0; }
 
-        #modal, #user-modal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #161b22; padding: 20px; border-radius: 12px; border: 2px solid var(--accent); display: none; flex-direction: column; gap: 15px; z-index: 1000; width: 85%; max-width: 300px; box-shadow: 0 0 100px black; }
-        input { padding: 12px; background: #0d1117; color: white; border: 1px solid var(--accent); border-radius: 8px; }
-        .btn-big { width: 100%; padding: 15px; border-radius: 10px; border: none; font-weight: bold; cursor: pointer; color: white; }
+        .btn-action { width: 100%; padding: 18px; border-radius: 10px; border: none; font-weight: bold; cursor: pointer; font-size: 1.1em; color: white; background: var(--success); }
+        
+        .photo-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 15px; }
+        .photo-item { background: var(--card); border-radius: 8px; overflow: hidden; border: 1px solid #30363d; }
+        .photo-item img { width: 100%; aspect-ratio: 1/1; object-fit: cover; }
+        .photo-label { padding: 5px; font-size: 0.8rem; text-align: center; font-weight: bold; }
+
+        #upload-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: none; align-items: center; justify-content: center; padding: 20px; z-index: 1000; }
+        .modal-card { background: var(--card); padding: 25px; border-radius: 15px; border: 2px solid var(--accent); width: 100%; max-width: 320px; text-align: center; }
+        input { width: 100%; padding: 15px; margin: 10px 0; background: #0d1117; border: 1px solid #30363d; border-radius: 8px; color: white; font-size: 16px; box-sizing: border-box; }
     </style>
 </head>
 <body>
 
-<div id="user-modal" style="display: flex;">
-    <h3 style="margin:0">Tvoje meno:</h3>
-    <input type="text" id="user-nickname" placeholder="Napr. Adam">
-    <button class="btn-big" style="background: var(--accent);" onclick="saveUser()">VSTÚPIŤ</button>
-</div>
-
 <nav>
-    <button class="nav-btn active" onclick="setMode('test', this)">TEST</button>
-    <button class="nav-btn" onclick="setMode('train', this)">TRÉNING</button>
+    <button id="btn-test" class="nav-btn active" onclick="switchTab('test')">TESTOVANIE</button>
+    <button id="btn-train" class="nav-btn" onclick="switchTab('train')">TRÉNOVANIE</button>
 </nav>
 
 <div class="main">
-    <div id="video-box">
-        <video autoplay playsinline muted id="webcam" class="mirror"></video>
-        <div id="modal">
-            <h3 style="margin:0">Čo je to?</h3>
-            <input type="text" id="obj-name" placeholder="Názov...">
-            <button class="btn-big" style="background: var(--success);" onclick="uploadToCloud()">ULOŽIŤ</button>
-            <button onclick="closeModal()" style="background:transparent; color:gray; border:none;">Zrušiť</button>
+    <div id="video-container">
+        <video id="webcam" autoplay playsinline muted class="mirror"></video>
+    </div>
+
+    <div id="ui-test">
+        <div class="res-box">
+            <div id="result" class="res-text">Načítavam...</div>
         </div>
     </div>
 
-    <div id="sidebar">
-        <div id="ui-test">
-            <div id="test-result" class="res-text">...</div>
-            <div id="current-user-display" style="text-align:center; font-size:0.8em; color: #58a6ff;"></div>
-        </div>
-        
-        <div id="ui-train" style="display:none">
-            <button class="btn-big" style="background: var(--accent);" onclick="takePhoto()">ODFOTIŤ</button>
-            <input type="text" id="search" placeholder="Hľadať v pamäti..." oninput="refreshGallery()" style="width:100%; margin-top:15px; box-sizing:border-box">
-            <div id="gallery" class="photo-grid"></div>
-        </div>
+    <div id="ui-train" style="display:none">
+        <button class="btn-action" onclick="startCapture()">ODFOTIŤ NOVÝ OBJEKT</button>
+        <input type="text" id="search" placeholder="Hľadať v galérii..." oninput="renderGallery()">
+        <div id="gallery" class="photo-grid"></div>
+    </div>
+</div>
+
+<div id="upload-modal">
+    <div class="modal-card">
+        <h3>Čo si odfotil?</h3>
+        <input type="text" id="obj-name" placeholder="Názov (napr. Ovládač)">
+        <button class="btn-action" style="background:var(--accent)" onclick="confirmUpload()">ULOŽIŤ VŠETKÝM</button>
+        <button onclick="closeModal()" style="background:transparent; color:gray; border:none; margin-top:10px; cursor:pointer;">Zrušiť</button>
     </div>
 </div>
 
@@ -88,116 +84,100 @@
     };
 
     firebase.initializeApp(firebaseConfig);
-    const database = firebase.database();
-    
+    const db = firebase.database();
     let classifier = knnClassifier.create();
     let net;
-    let userName = localStorage.getItem('ai_user') || "";
-    const video = document.getElementById('webcam');
-    let allData = {};
 
-    if(userName) {
-        document.getElementById('user-modal').style.display = 'none';
-        document.getElementById('current-user-display').innerText = "Prihlásený ako: " + userName;
-    }
-
-    function saveUser() {
-        const name = document.getElementById('user-nickname').value.trim();
-        if(!name) return alert("Zadaj meno!");
-        userName = name;
-        localStorage.setItem('ai_user', name);
-        document.getElementById('user-modal').style.display = 'none';
-        document.getElementById('current-user-display').innerText = "Prihlásený ako: " + userName;
-    }
-
-    async function init() {
+    async function initAI() {
         net = await tf.loadLayersModel('https://storage.googleapis.com/tfjs-models/tfjs/mobilenet_v1_0.25_224/model.json');
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
-        video.srcObject = stream;
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+            document.getElementById('webcam').srcObject = stream;
+        } catch(e) { document.getElementById('result').innerText = "Chyba kamery!"; }
 
-        database.ref('ai_memory').on('value', async (snapshot) => {
-            const data = snapshot.val();
-            if (data) {
-                allData = data;
-                await updateAIModel(data);
-                refreshGallery();
-                document.getElementById('test-result').innerText = "Pripravený";
+        db.ref('ai_memory').on('value', async snap => {
+            const data = snap.val();
+            if(data) {
+                window.globalMemory = data;
+                classifier.clearAllClasses();
+                for(let label in data) {
+                    for(let entry of Object.values(data[label])) {
+                        const img = new Image(); img.src = entry.img;
+                        await new Promise(r => img.onload = r);
+                        const t = tf.browser.fromPixels(img).resizeBilinear([224, 224]).expandDims(0).toFloat().div(127).sub(1);
+                        classifier.addExample(net.predict(t), label);
+                    }
+                }
+                document.getElementById('result').innerText = "Hľadám...";
+                renderGallery();
+            } else {
+                document.getElementById('result').innerText = "Pustá pamäť";
             }
         });
-        predict();
+        runPredict();
     }
 
-    async function updateAIModel(data) {
-        classifier.clearAllClasses();
-        for (let label in data) {
-            for (let entry of Object.values(data[label])) {
-                const img = new Image();
-                img.src = entry.img; // Načítame z nového formátu
-                await new Promise(r => img.onload = r);
-                const tensor = tf.browser.fromPixels(img).resizeBilinear([224, 224]).expandDims(0).toFloat().div(127).sub(1);
-                classifier.addExample(net.predict(tensor), label);
-            }
+    async function runPredict() {
+        const video = document.getElementById('webcam');
+        if(!video.paused && classifier.getNumClasses() > 0) {
+            const img = await tf.browser.fromPixels(video);
+            const t = img.resizeBilinear([224, 224]).expandDims(0).toFloat().div(127).sub(1);
+            const res = await classifier.predictClass(net.predict(t));
+            document.getElementById('result').innerText = res.confidences[res.label] > 0.6 ? res.label : "???";
+            img.dispose(); t.dispose();
         }
+        requestAnimationFrame(runPredict);
     }
 
-    function takePhoto() {
+    function switchTab(tab) {
+        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById('btn-' + tab).classList.add('active');
+        document.getElementById('ui-test').style.display = tab === 'test' ? 'block' : 'none';
+        document.getElementById('ui-train').style.display = tab === 'train' ? 'block' : 'none';
+    }
+
+    function startCapture() {
+        const video = document.getElementById('webcam');
         const canvas = document.createElement('canvas');
         canvas.width = 224; canvas.height = 224;
         const ctx = canvas.getContext('2d');
         ctx.translate(224, 0); ctx.scale(-1, 1);
         ctx.drawImage(video, 0, 0, 224, 224);
-        window.currentSnap = canvas.toDataURL('image/jpeg', 0.6);
+        window.tempSnap = canvas.toDataURL('image/jpeg', 0.6);
         video.pause();
-        document.getElementById('modal').style.display = 'flex';
+        document.getElementById('upload-modal').style.display = 'flex';
     }
 
-    function uploadToCloud() {
+    function confirmUpload() {
         const name = document.getElementById('obj-name').value.trim().toLowerCase();
-        if(!name) return alert("Zadaj názov!");
-        
-        // Ukladáme fotku AJ meno autora
-        database.ref('ai_memory/' + name).push({
-            img: window.currentSnap,
-            user: userName
-        });
+        if(!name) return;
+        db.ref('ai_memory/' + name).push({ img: window.tempSnap });
         closeModal();
     }
 
-    function refreshGallery() {
+    function closeModal() {
+        document.getElementById('upload-modal').style.display = 'none';
+        document.getElementById('webcam').play();
+    }
+
+    function renderGallery() {
         const q = document.getElementById('search').value.toLowerCase();
-        const gallery = document.getElementById('gallery');
-        gallery.innerHTML = "";
-        if (q && allData[q]) {
-            Object.values(allData[q]).forEach(entry => {
-                const card = document.createElement('div');
-                card.className = "photo-card";
-                card.innerHTML = `<img src="${entry.img}"><div class="author">Od: ${entry.user || 'Neznámy'}</div>`;
-                gallery.appendChild(card);
-            });
+        const g = document.getElementById('gallery');
+        g.innerHTML = "";
+        if(!window.globalMemory || !q) return;
+        for(let label in window.globalMemory) {
+            if(label.includes(q)) {
+                Object.values(window.globalMemory[label]).forEach(e => {
+                    const div = document.createElement('div');
+                    div.className = "photo-item";
+                    div.innerHTML = `<img src="${e.img}"><div class="photo-label">${label}</div>`;
+                    g.appendChild(div);
+                });
+            }
         }
     }
 
-    async function predict() {
-        if(!video.paused && classifier.getNumClasses() > 0) {
-            const img = await tf.browser.fromPixels(video);
-            const processed = img.resizeBilinear([224, 224]).expandDims(0).toFloat().div(127).sub(1);
-            const res = await classifier.predictClass(net.predict(processed));
-            document.getElementById('test-result').innerText = res.confidences[res.label] > 0.55 ? res.label : "???";
-            img.dispose(); processed.dispose();
-        }
-        requestAnimationFrame(predict);
-    }
-
-    function setMode(mode, btn) {
-        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        document.getElementById('ui-test').style.display = mode === 'test' ? 'block' : 'none';
-        document.getElementById('ui-train').style.display = mode === 'train' ? 'block' : 'none';
-    }
-
-    function closeModal() { document.getElementById('modal').style.display = 'none'; video.play(); }
-
-    init();
+    initAI();
 </script>
 </body>
 </html>
