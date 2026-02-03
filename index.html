@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Verejná AI Pamäť</title>
+    <title>Živá AI Pamäť</title>
     
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
@@ -22,6 +22,11 @@
         #video-container { width: 100%; aspect-ratio: 1/1; background: black; border-radius: 15px; overflow: hidden; position: relative; border: 2px solid #30363d; }
         video { width: 100%; height: 100%; object-fit: cover; }
         .mirror { transform: scaleX(-1); }
+
+        /* Log udalostí */
+        #event-log { background: rgba(0,0,0,0.5); border-radius: 10px; padding: 10px; font-size: 0.8rem; max-height: 80px; overflow-y: auto; border: 1px dashed #444; color: #8b949e; }
+        .log-entry { border-bottom: 1px solid #333; padding: 3px 0; }
+        .log-entry.new { color: var(--accent); font-weight: bold; }
 
         .res-box { background: var(--card); padding: 20px; border-radius: 12px; text-align: center; border: 1px solid #30363d; }
         .res-text { font-size: 2.5rem; font-weight: bold; color: #f1c40f; margin: 5px 0; }
@@ -50,6 +55,10 @@
         <video id="webcam" autoplay playsinline muted class="mirror"></video>
     </div>
 
+    <div id="event-log">
+        <div class="log-entry">Systém pripravený. Čakám na dáta...</div>
+    </div>
+
     <div id="ui-test">
         <div class="res-box">
             <div id="result" class="res-text">Načítavam...</div>
@@ -58,16 +67,16 @@
 
     <div id="ui-train" style="display:none">
         <button class="btn-action" onclick="startCapture()">ODFOTIŤ NOVÝ OBJEKT</button>
-        <input type="text" id="search" placeholder="Hľadať v galérii..." oninput="renderGallery()">
+        <input type="text" id="search" placeholder="Hľadať v pamäti..." oninput="renderGallery()" style="margin-top:10px">
         <div id="gallery" class="photo-grid"></div>
     </div>
 </div>
 
 <div id="upload-modal">
     <div class="modal-card">
-        <h3>Čo si odfotil?</h3>
-        <input type="text" id="obj-name" placeholder="Názov (napr. Ovládač)">
-        <button class="btn-action" style="background:var(--accent)" onclick="confirmUpload()">ULOŽIŤ VŠETKÝM</button>
+        <h3>Názov objektu</h3>
+        <input type="text" id="obj-name" placeholder="Napr. Pero">
+        <button class="btn-action" style="background:var(--accent)" onclick="confirmUpload()">ULOŽIŤ DO CLOUDU</button>
         <button onclick="closeModal()" style="background:transparent; color:gray; border:none; margin-top:10px; cursor:pointer;">Zrušiť</button>
     </div>
 </div>
@@ -87,6 +96,16 @@
     const db = firebase.database();
     let classifier = knnClassifier.create();
     let net;
+    let firstLoad = true;
+
+    function addLog(msg, isNew = false) {
+        const log = document.getElementById('event-log');
+        const entry = document.createElement('div');
+        entry.className = isNew ? "log-entry new" : "log-entry";
+        const time = new Date().toLocaleTimeString();
+        entry.innerText = `[${time}] ${msg}`;
+        log.prepend(entry);
+    }
 
     async function initAI() {
         net = await tf.loadLayersModel('https://storage.googleapis.com/tfjs-models/tfjs/mobilenet_v1_0.25_224/model.json');
@@ -98,6 +117,7 @@
         db.ref('ai_memory').on('value', async snap => {
             const data = snap.val();
             if(data) {
+                if(!firstLoad) addLog("Pamäť aktualizovaná z cloudu!", true);
                 window.globalMemory = data;
                 classifier.clearAllClasses();
                 for(let label in data) {
@@ -110,8 +130,7 @@
                 }
                 document.getElementById('result').innerText = "Hľadám...";
                 renderGallery();
-            } else {
-                document.getElementById('result').innerText = "Pustá pamäť";
+                firstLoad = false;
             }
         });
         runPredict();
@@ -152,6 +171,7 @@
         const name = document.getElementById('obj-name').value.trim().toLowerCase();
         if(!name) return;
         db.ref('ai_memory/' + name).push({ img: window.tempSnap });
+        addLog(`Odosielam "${name}" do cloudu...`);
         closeModal();
     }
 
