@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Živá AI Pamäť</title>
+    <title>AI Pamäť - Diagnostika</title>
     
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
@@ -11,7 +11,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/knn-classifier"></script>
 
     <style>
-        :root { --bg: #0d1117; --accent: #58a6ff; --success: #238636; --card: #161b22; }
+        :root { --bg: #0d1117; --accent: #58a6ff; --success: #238636; --card: #161b22; --err: #da3633; }
         body { margin: 0; background: var(--bg); color: white; font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
         
         nav { background: var(--card); padding: 10px; display: flex; gap: 8px; border-bottom: 1px solid #30363d; }
@@ -23,10 +23,10 @@
         video { width: 100%; height: 100%; object-fit: cover; }
         .mirror { transform: scaleX(-1); }
 
-        /* Log udalostí */
-        #event-log { background: rgba(0,0,0,0.5); border-radius: 10px; padding: 10px; font-size: 0.8rem; max-height: 80px; overflow-y: auto; border: 1px dashed #444; color: #8b949e; }
-        .log-entry { border-bottom: 1px solid #333; padding: 3px 0; }
-        .log-entry.new { color: var(--accent); font-weight: bold; }
+        /* Log udalostí pre diagnostiku chýb */
+        #event-log { background: #000; border-radius: 10px; padding: 10px; font-family: monospace; font-size: 0.75rem; max-height: 100px; overflow-y: auto; border: 1px solid #444; color: #aaa; }
+        .log-err { color: var(--err); font-weight: bold; }
+        .log-ok { color: #2ea043; }
 
         .res-box { background: var(--card); padding: 20px; border-radius: 12px; text-align: center; border: 1px solid #30363d; }
         .res-text { font-size: 2.5rem; font-weight: bold; color: #f1c40f; margin: 5px 0; }
@@ -46,8 +46,8 @@
 <body>
 
 <nav>
-    <button id="btn-test" class="nav-btn active" onclick="switchTab('test')">TESTOVANIE</button>
-    <button id="btn-train" class="nav-btn" onclick="switchTab('train')">TRÉNOVANIE</button>
+    <button id="btn-test" class="nav-btn active" onclick="switchTab('test')">TEST</button>
+    <button id="btn-train" class="nav-btn" onclick="switchTab('train')">TRÉNING</button>
 </nav>
 
 <div class="main">
@@ -56,17 +56,17 @@
     </div>
 
     <div id="event-log">
-        <div class="log-entry">Systém pripravený. Čakám na dáta...</div>
+        <div>[INFO] Systém sa spúšťa...</div>
     </div>
 
     <div id="ui-test">
         <div class="res-box">
-            <div id="result" class="res-text">Načítavam...</div>
+            <div id="result" class="res-text">...</div>
         </div>
     </div>
 
     <div id="ui-train" style="display:none">
-        <button class="btn-action" onclick="startCapture()">ODFOTIŤ NOVÝ OBJEKT</button>
+        <button class="btn-action" onclick="startCapture()">ODFOTIŤ NOVÚ VEC</button>
         <input type="text" id="search" placeholder="Hľadať v pamäti..." oninput="renderGallery()" style="margin-top:10px">
         <div id="gallery" class="photo-grid"></div>
     </div>
@@ -75,13 +75,14 @@
 <div id="upload-modal">
     <div class="modal-card">
         <h3>Názov objektu</h3>
-        <input type="text" id="obj-name" placeholder="Napr. Pero">
+        <input type="text" id="obj-name" placeholder="Napr. Mobil">
         <button class="btn-action" style="background:var(--accent)" onclick="confirmUpload()">ULOŽIŤ DO CLOUDU</button>
         <button onclick="closeModal()" style="background:transparent; color:gray; border:none; margin-top:10px; cursor:pointer;">Zrušiť</button>
     </div>
 </div>
 
 <script>
+    // 1. SKONTROLUJ TIETO ÚDAJE VO SVOJOM FIREBASE!
     const firebaseConfig = {
         apiKey: "AIzaSyBojtyniuMTYlTGCvWNrKt-jeGLGGa4Mh4",
         authDomain: "mojanevytrenovana-ia.firebaseapp.com",
@@ -92,58 +93,90 @@
         appId: "1:1032274868821:web:9ce396023dc4c15629b2dc"
     };
 
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
-    let classifier = knnClassifier.create();
-    let net;
-    let firstLoad = true;
-
-    function addLog(msg, isNew = false) {
+    // Pomocná funkcia na logovanie
+    function addLog(msg, type = 'info') {
         const log = document.getElementById('event-log');
         const entry = document.createElement('div');
-        entry.className = isNew ? "log-entry new" : "log-entry";
-        const time = new Date().toLocaleTimeString();
-        entry.innerText = `[${time}] ${msg}`;
+        if(type === 'err') entry.className = 'log-err';
+        if(type === 'ok') entry.className = 'log-ok';
+        entry.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
         log.prepend(entry);
     }
 
-    async function initAI() {
-        net = await tf.loadLayersModel('https://storage.googleapis.com/tfjs-models/tfjs/mobilenet_v1_0.25_224/model.json');
+    // Inicializácia Firebase
+    try {
+        firebase.initializeApp(firebaseConfig);
+        addLog("Firebase: Pripojené.", "ok");
+    } catch(e) {
+        addLog("Firebase: Chyba inicializácie!", "err");
+    }
+
+    const db = firebase.database();
+    let classifier = knnClassifier.create();
+    let net;
+
+    async function init() {
+        // Načítanie AI
+        try {
+            addLog("AI: Načítavam model...");
+            net = await tf.loadLayersModel('https://storage.googleapis.com/tfjs-models/tfjs/mobilenet_v1_0.25_224/model.json');
+            addLog("AI: Model pripravený.", "ok");
+        } catch(e) {
+            addLog("AI: Nepodarilo sa stiahnuť model!", "err");
+        }
+
+        // Zapnutie kamery
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
             document.getElementById('webcam').srcObject = stream;
-        } catch(e) { document.getElementById('result').innerText = "Chyba kamery!"; }
+            addLog("Kamera: Zapnutá.", "ok");
+        } catch(e) {
+            addLog("Kamera: Prístup zamietnutý!", "err");
+        }
 
+        // Pripojenie k databáze a sledovanie zmien
         db.ref('ai_memory').on('value', async snap => {
             const data = snap.val();
             if(data) {
-                if(!firstLoad) addLog("Pamäť aktualizovaná z cloudu!", true);
+                addLog("Cloud: Sťahujem nové dáta...");
                 window.globalMemory = data;
                 classifier.clearAllClasses();
-                for(let label in data) {
-                    for(let entry of Object.values(data[label])) {
-                        const img = new Image(); img.src = entry.img;
-                        await new Promise(r => img.onload = r);
-                        const t = tf.browser.fromPixels(img).resizeBilinear([224, 224]).expandDims(0).toFloat().div(127).sub(1);
-                        classifier.addExample(net.predict(t), label);
+                try {
+                    for(let label in data) {
+                        for(let entry of Object.values(data[label])) {
+                            const img = new Image(); img.src = entry.img;
+                            await new Promise(r => img.onload = r);
+                            const t = tf.browser.fromPixels(img).resizeBilinear([224, 224]).expandDims(0).toFloat().div(127).sub(1);
+                            classifier.addExample(net.predict(t), label);
+                        }
                     }
+                    addLog("Cloud: Dáta spracované.", "ok");
+                    document.getElementById('result').innerText = "Hľadám...";
+                } catch(e) {
+                    addLog("AI: Chyba pri spracovaní fotiek!", "err");
                 }
-                document.getElementById('result').innerText = "Hľadám...";
                 renderGallery();
-                firstLoad = false;
+            } else {
+                addLog("Cloud: Databáza je zatiaľ prázdna.");
+                document.getElementById('result').innerText = "Nič nepoznám";
             }
+        }, (err) => {
+            addLog("Cloud: Prístup zamietnutý (Rules)!", "err");
         });
+
         runPredict();
     }
 
     async function runPredict() {
         const video = document.getElementById('webcam');
         if(!video.paused && classifier.getNumClasses() > 0) {
-            const img = await tf.browser.fromPixels(video);
-            const t = img.resizeBilinear([224, 224]).expandDims(0).toFloat().div(127).sub(1);
-            const res = await classifier.predictClass(net.predict(t));
-            document.getElementById('result').innerText = res.confidences[res.label] > 0.6 ? res.label : "???";
-            img.dispose(); t.dispose();
+            try {
+                const img = await tf.browser.fromPixels(video);
+                const t = img.resizeBilinear([224, 224]).expandDims(0).toFloat().div(127).sub(1);
+                const res = await classifier.predictClass(net.predict(t));
+                document.getElementById('result').innerText = res.confidences[res.label] > 0.6 ? res.label : "???";
+                img.dispose(); t.dispose();
+            } catch(e) {}
         }
         requestAnimationFrame(runPredict);
     }
@@ -170,8 +203,9 @@
     function confirmUpload() {
         const name = document.getElementById('obj-name').value.trim().toLowerCase();
         if(!name) return;
-        db.ref('ai_memory/' + name).push({ img: window.tempSnap });
-        addLog(`Odosielam "${name}" do cloudu...`);
+        db.ref('ai_memory/' + name).push({ img: window.tempSnap })
+            .then(() => addLog(`Cloud: "${name}" uložené!`, "ok"))
+            .catch(e => addLog("Cloud: Chyba pri ukladaní!", "err"));
         closeModal();
     }
 
@@ -197,7 +231,7 @@
         }
     }
 
-    initAI();
+    window.onload = init;
 </script>
 </body>
 </html>
